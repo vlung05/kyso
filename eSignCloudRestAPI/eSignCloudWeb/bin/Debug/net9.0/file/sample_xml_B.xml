@@ -1,0 +1,43 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<DKyThueDTu xmlns="http://kekhaithue.gdt.gov.vn/HSoDKy" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+	<DKyThue id="id-836a41b0-2c34-422f-ab5b-646963e41ac9">
+		<TTinChung>
+			<CQT>
+				<maCQT>10101</maCQT>
+				<tenCQT/>
+				<DVu>
+					<maDVu>00008</maDVu>
+					<tenDVu>TAX.VN - Ký điện tử</tenDVu>
+					<soGPhepKDoanh/>
+				</DVu>
+			</CQT>
+			<TTinDKyThue>
+				<maDKy>220</maDKy>
+				<mauDKy/>
+				<tenDKy>Đăng ký thêm tờ khai T-VAN</tenDKy>
+				<pBanDKy>2.0.9</pBanDKy>
+				<ngayDKy>2020-03-10</ngayDKy>
+				<tIN>0101243150-999</tIN>
+				<tenNNT>T-VAN</tenNNT>
+			</TTinDKyThue>
+		</TTinChung>
+		<NDungDKy>
+			<ten_T_VAN>TAX</ten_T_VAN>
+			<DSachHSoDKyNop>
+				<NoiDungChiTiet id="ID_1">
+					<maHSo>01</maHSo>
+					<tenHSo>Tờ khai GTGT khấu trừ (01/GTGT) theo quý</tenHSo>
+					<kyBDau>Q1/2020</kyBDau>
+				</NoiDungChiTiet>
+				<NoiDungChiTiet id="ID_2">
+					<maHSo>01</maHSo>
+					<tenHSo>Tờ khai GTGT khấu trừ (01/GTGT) theo tháng</tenHSo>
+					<kyBDau>02/2020</kyBDau>
+				</NoiDungChiTiet>
+			</DSachHSoDKyNop>
+		</NDungDKy>
+	</DKyThue>
+	<DKyThue1>
+		<NDungDKy1></NDungDKy1>
+	</DKyThue1>
+</DKyThueDTu>

@@ -1,0 +1,98 @@
+{
+  "RestUrl": "https://prd-rssp.mobile-id.vn/eSignCloud/restapi/",
+  "RelyingParty": "RSSP",
+  "RelyingPartyUser": "rsspdemo",
+  "RelyingPartyPassword": "12345678",
+  "RelyingPartySignature": "f3eL/n2q5rLn3SdzGfvl1V4MzgPqM68M4TDVqF2fRHarKFQBVQnJU36DPtufu3ofyGVrsq9OgYh3Nujrx7/CUCiKd8I1Qms1y946jEo6wi55ietUQ6vW6/riMwG0blknbb7Wj5tP4SDe1upNydwetgwvaNEKEfv6kubvNqJVkYCo+bFr2rcWV/u1s+i3L1wv4hRIpLZx0Je5IGurGgf2XkGWVhD6x8/AXyy/qmrZ3IzHnFaiWOuy2Dv+NzVLSR0NPU+Zr3btTYMa/ZUa1YYJjrs6c1XLiiwLMJURac/C5j6i5VSRfTQDSHUkIOfTDtN6oRVLZ5ewQ0aQc6tW/FuM2w==",
+  "RelyingPartyKeyStore": "file/rssp.p12",
+  "RelyingPartyKeyStorePassword": "12345678",
+  "CertificateProfile": "PERS.1D",
+  "DefaultAgreementUUID": "562449E1-090C-4573-B978-76A740B9F50A",
+  "DefaultPassCode": "12345678",
+  "FileDirectory": "storage/",
+  "AdminUsername": "admin",
+  "AdminPassword": "admin123",
+  "AdminUids": [
+    "562449E1-090C-4573-B978-76A740B9F50A"
+  ],
+  "EnableDemoSimulation": true,
+  "DefaultMetadata": {
+    "PAGENO": "1",
+    "POSITIONIDENTIFIER": "CHỮ KÝ ĐIỆN TỬ",
+    "RECTANGLEOFFSET": "-30,-100",
+    "RECTANGLESIZE": "170,70",
+    "VISIBLESIGNATURE": "True",
+    "VISUALSTATUS": "False",
+    "SHOWSIGNERINFO": "True",
+    "SIGNERINFOPREFIX": "Ký bởi:",
+    "SHOWDATETIME": "True",
+    "DATETIMEPREFIX": "Ký ngày:",
+    "SHOWREASON": "True",
+    "SIGNREASONPREFIX": "Lý do:",
+    "SIGNREASON": "Tôi đồng ý",
+    "SHOWLOCATION": "True",
+    "LOCATION": "Hồ Chí Minh",
+    "LOCATIONPREFIX": "Nơi ký:",
+    "TEXTCOLOR": "black",
+    "IMAGEANDTEXT": "False",
+    "TEXTDIRECTION": "LEFTTORIGHT"
+  },
+  "Slides": [
+    {
+      "Id": 1,
+      "Tag": "DỊCH VỤ CHỮ KÝ SỐ CLOUD",
+      "Title": "Ký Số Từ Xa Mobile-ID RSSP",
+      "Description": "Ký số mọi lúc, mọi nơi trên đa thiết bị không cần USB Token. Đạt chuẩn bảo mật eIDAS & TT 16/2019/BTTTT.",
+      "Gradient": "linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)",
+      "Icon": "shield-check",
+      "ButtonText": "Khám phá ngay",
+      "ButtonLink": "#"
+    },
+    {
+      "Id": 2,
+      "Tag": "TÍNH NĂNG NỔI BẬT",
+      "Title": "Tương Thích PDF & Microsoft Word",
+      "Description": "Hỗ trợ định dạng tài liệu PDF, DOC, DOCX. Tùy biến vị trí ký linh hoạt, chữ ký đồ họa chuẩn pháp lý.",
+      "Gradient": "linear-gradient(135deg, #0ba360 0%, #3cba92 100%)",
+      "Icon": "file-signature",
+      "ButtonText": "Ký thử tài liệu",
+      "ButtonLink": "#"
+    },
+    {
+      "Id": 3,
+      "Tag": "BẢO MẬT TUYỆT ĐỐI",
+      "Title": "Xác Thực Passcode & OTP 2 Lớp",
+      "Description": "Bảo vệ giao dịch ký an toàn với xác thực PassCode cá nhân hóa và mã OTP tức thời từ Mobile-ID.",
+      "Gradient": "linear-gradient(135deg, #7928ca 0%, #ff0080 100%)",
+      "Icon": "lock",
+      "ButtonText": "Xem tài liệu API",
+      "ButtonLink": "#"
+    }
+  ],
+  "Accounts": [
+    {
+      "AgreementUUID": "562449E1-090C-4573-B978-76A740B9F50A",
+      "SignerName": "Nguyễn Văn A (Giám Đốc)",
+      "Department": "Ban Giám Đốc",
+      "Email": "nguyenvana@icorp.vn",
+      "Phone": "0901234567",
+      "DefaultPasscode": "12345678",
+      "Status": "Hoạt động",
+      "CreatedDate": "2026-08-20T16:01:54.6686251+07:00",
+      "CertificateDN": "CN=Nguyễn Văn A, O=Mobile-ID CA, C=VN",
+      "CertificateSerialNumber": "562449E1090C4573B97876A740B9F50A"
+    },
+    {
+      "AgreementUUID": "836A41B0-2C34-422F-AB5B-646963E41AC9",
+      "SignerName": "Trần Thị B (Kế Toán Trưởng)",
+      "Department": "Phòng Kế Toán",
+      "Email": "tranthib@icorp.vn",
+      "Phone": "0907654321",
+      "DefaultPasscode": "12345678",
+      "Status": "Hoạt động",
+      "CreatedDate": "2026-08-20T16:01:54.6702975+07:00",
+      "CertificateDN": "CN=Trần Thị B, O=Mobile-ID CA, C=VN",
+      "CertificateSerialNumber": "836A41B02C34422FAB5B646963E41AC9"
+    }
+  ]
+}

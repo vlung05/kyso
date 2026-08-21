@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>eSignCloud Portal - Hệ Thống Ký Số Điện Tử Mobile-ID</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
+    rel="stylesheet">
+  <link rel="icon" type="image/png" href="assets/logo.png">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+
+  <div class="app-container">
+
+    <!-- APP HEADER -->
+    <header class="app-header">
+      <a href="#" class="brand-logo" onclick="app.showDashboard(); return false;">
+        <img src="assets/logo.png" alt="PMBK Logo" class="brand-img-logo">
+        <div class="brand-divider"></div>
+        <div class="brand-text">
+          <h1>eSignCloud Portal</h1>
+          <p>Hệ Thống Ký Số Điện Tử</p>
+        </div>
+      </a>
+
+      <div class="header-actions">
+        <!-- Live Status Indicator -->
+        <!-- <div class="user-badge" id="header-status-badge">
+          <span style="width: 8px; height: 8px; border-radius: 50%; background: #10b981; display: inline-block;"></span>
+          <span style="font-size: 0.8rem; color: #94a3b8;">Hệ thống sẵn sàng</span>
+        </div> -->
+
+        <!-- User Badge when Logged In -->
+        <div class="user-badge" id="header-user-badge" style="display: none;">
+          <div class="user-avatar" id="header-user-avatar">U</div>
+          <div style="min-width: 0; overflow: hidden;">
+            <div id="header-user-name"
+              style="font-size: 0.75rem; color: #38bdf8; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px;">
+              Chủ Tài Khoản</div>
+            <div class="user-uid" id="header-user-uid"
+              style="font-size: 0.7rem; color: #94a3b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px;">
+              --</div>
+          </div>
+        </div>
+
+        <!-- Admin Role Badge & Action Buttons -->
+        <div class="header-btns-group">
+          <span class="badge-fmt" id="badge-admin"
+            style="display: none; background: rgba(239, 68, 68, 0.2); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.4);">
+            <i class="fa-solid fa-user-shield"></i> Admin
+          </span>
+
+          <!-- Settings Button (Admin Only) -->
+          <button class="btn btn-outline btn-sm" id="btn-settings" style="display: none;" onclick="app.showSettings()"
+            title="Cấu hình hệ thống (Dành riêng cho Quản trị viên)">
+            <i class="fa-solid fa-gear"></i> Cấu hình
+          </button>
+
+          <!-- Logout Button -->
+          <button class="btn btn-danger btn-sm" id="btn-logout" style="display: none;" onclick="app.logout()">
+            <i class="fa-solid fa-right-from-bracket"></i> Đăng xuất
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- ===================================================================
+         VIEW 1: LOGIN PAGE (Slide Quảng Cáo + Box Đăng Nhập UID/Passcode)
+         =================================================================== -->
+    <section id="view-login" class="view-section active">
+      <div class="login-wrapper">
+
+        <!-- Slide Quảng Cáo (Login Page Slider) -->
+        <div class="slider-container" id="login-slider">
+          <div class="slider-wrapper" id="login-slider-wrapper">
+            <!-- Dynamic slides rendered here -->
+          </div>
+          <div class="slider-controls">
+            <div class="slider-dots" id="login-slider-dots"></div>
+            <button class="slider-arrow" onclick="sliderLogin.prev()"><i class="fa-solid fa-chevron-left"></i></button>
+            <button class="slider-arrow" onclick="sliderLogin.next()"><i class="fa-solid fa-chevron-right"></i></button>
+          </div>
+        </div>
+
+        <!-- Box Đăng Nhập UID + Passcode -->
+        <div class="glass-card login-card">
+          <div class="login-header">
+            <h2>Đăng Nhập Ký Số</h2>
+            <p>Nhập thông tin UID & Passcode để truy cập dịch vụ</p>
+          </div>
+
+          <!-- Quick Demo Account Helper -->
+          <!-- <div class="quick-demo-box">
+            <div>
+              <i class="fa-solid fa-circle-info" style="color: var(--accent); margin-right: 6px;"></i>
+              <span>Tài khoản Demo sẵn có</span>
+            </div>
+            <button type="button" class="btn btn-outline btn-sm" onclick="app.fillDemoAccount()">
+              <i class="fa-solid fa-wand-magic-sparkles"></i> Điền nhanh
+            </button>
+          </div> -->
+
+          <form id="form-login" onsubmit="app.handleLogin(event)">
+            <div class="form-group">
+              <label class="form-label" for="login-uid">
+                <span><i class="fa-solid fa-id-card"></i> UID (agreementUUID)</span>
+                <span style="font-size: 0.75rem; color: var(--accent);">Bắt buộc</span>
+              </label>
+              <input type="text" id="login-uid" class="form-input"
+                placeholder="Ví dụ: 562449E1-090C-4573-B978-76A740B9F50A" required autocomplete="off">
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="login-passcode">
+                <span><i class="fa-solid fa-key"></i> Passcode ký số</span>
+                <span style="font-size: 0.75rem; color: var(--accent);">Mật mã PIN</span>
+              </label>
+              <div class="input-password-wrapper">
+                <input type="password" id="login-passcode" class="form-input"
+                  placeholder="Nhập mã passcode ký số (vd: 12345678)" required>
+                <button type="button" class="btn-toggle-pwd"
+                  onclick="app.togglePasswordVisibility('login-passcode', this)">
+                  <i class="fa-solid fa-eye"></i>
+                </button>
+              </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-lg" id="btn-login-submit"
+              style="width: 100%; margin-top: 10px;">
+              <i class="fa-solid fa-arrow-right-to-bracket"></i> Đăng Nhập Vào Hệ Thống
+            </button>
+          </form>
+
+          <div class="login-footer-links">
+            <a href="#" onclick="app.openModal('modal-forget-passcode'); return false;">
+              <i class="fa-solid fa-unlock-keyhole"></i> Quên Passcode?
+            </a>
+            <a href="#" onclick="app.openModal('modal-change-passcode'); return false;">
+              <i class="fa-solid fa-key"></i> Đổi Passcode
+            </a>
+            <!-- <a href="#" onclick="app.fillAdminAccount(); return false;" title="Điền tài khoản Quản trị viên">
+              <i class="fa-solid fa-user-shield"></i> Quản trị viên
+            </a> -->
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ===================================================================
+         VIEW 2: SIGNING DASHBOARD (3 BOXES LAYOUT)
+         =================================================================== -->
+    <section id="view-dashboard" class="view-section">
+      <div class="dashboard-grid">
+
+        <!-- BOX 1: UPLOAD FILE & NÚT GỬI KÝ SỐ -->
+        <div class="glass-card box-card">
+          <div class="box-header">
+            <div class="box-title">
+              <div class="box-title-icon"><i class="fa-solid fa-file-arrow-up"></i></div>
+              <span>1. Tải Lên & Gửi Ký Tài Liệu</span>
+            </div>
+            <span class="badge-fmt" style="background: rgba(37,99,235,0.2); color: #93c5fd;">PDF & Word</span>
+          </div>
+
+          <!-- Dropzone -->
+          <div class="dropzone" id="dropzone" onclick="document.getElementById('file-input').click()">
+            <input type="file" id="file-input" style="display: none;" accept=".pdf,.doc,.docx"
+              onchange="app.handleFileSelect(event)">
+            <div class="dropzone-icon">
+              <i class="fa-solid fa-cloud-arrow-up"></i>
+            </div>
+            <div class="dropzone-title">Kéo & Thả tài liệu cần ký vào đây</div>
+            <div class="dropzone-subtitle">Hoặc nhấp chuột để chọn file từ máy tính của bạn</div>
+            <div class="badge-formats">
+              <span class="badge-fmt"><i class="fa-regular fa-file-pdf"></i> .PDF</span>
+              <span class="badge-fmt"><i class="fa-regular fa-file-word"></i> .DOCX</span>
+              <span class="badge-fmt"><i class="fa-regular fa-file-word"></i> .DOC</span>
+            </div>
+          </div>
+
+          <!-- Selected File Card (Hidden until file chosen) -->
+          <div class="file-preview-card" id="selected-file-card" style="display: none;">
+            <div class="file-info-group">
+              <div class="file-type-icon" id="selected-file-icon">
+                <i class="fa-solid fa-file-pdf"></i>
+              </div>
+              <div class="file-details">
+                <h4 id="selected-file-name">document.pdf</h4>
+                <p id="selected-file-size">0 KB</p>
+              </div>
+            </div>
+            <button class="btn btn-outline btn-sm" onclick="app.removeSelectedFile()" title="Hủy chọn file">
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+          </div>
+
+          <!-- Collapsible Accordion: Tùy chỉnh thông số ký (Metadata) -->
+          <div class="meta-accordion" id="meta-accordion">
+            <div class="meta-accordion-header" onclick="app.toggleAccordion('meta-accordion')">
+              <span><i class="fa-solid fa-sliders"></i> Tùy chỉnh vị trí & thông tin chữ ký</span>
+              <i class="fa-solid fa-chevron-down accordion-arrow"></i>
+            </div>
+            <div class="meta-accordion-body">
+              <div class="meta-grid">
+                <div class="form-group" style="margin-bottom: 10px;">
+                  <label class="form-label" style="font-size: 0.75rem;">Số trang ký (PAGENO):</label>
+                  <input type="text" id="meta-pageno" class="form-input" value="-1"
+                    placeholder="-1 (Trang cuối) hoặc 1, 2...">
+                </div>
+                <div class="form-group" style="margin-bottom: 10px;">
+                  <label class="form-label" style="font-size: 0.75rem;">Từ khóa vị trí (POSITIONIDENTIFIER):</label>
+                  <input type="text" id="meta-posid" class="form-input" value="ĐẠI DIỆN BÊN B"
+                    placeholder="Ví dụ: ĐẠI DIỆN BÊN B, CHỮ KÝ...">
+                </div>
+                <div class="form-group" style="margin-bottom: 10px;">
+                  <label class="form-label"
+                    style="font-size: 0.75rem; display: flex; align-items: center; justify-content: space-between;">
+                    <span>Độ lệch tọa độ (RECTANGLEOFFSET: X,Y):</span>
+                  </label>
+                  <input type="text" id="meta-offset" class="form-input" value="-70,-60"
+                    placeholder="X,Y (ví dụ: -70,-60 hoặc -30,-100)">
+                  <div class="field-hint">
+                    <i class="fa-solid fa-crosshairs"></i> <b>Căn lề:</b> Góc dưới-trái từ khóa. <b>X:</b> Trái (-) /
+                    Phải (+), <b>Y:</b> Dưới (-) / Trên (+)
+                  </div>
+                </div>
+                <div class="form-group" style="margin-bottom: 10px;">
+                  <label class="form-label"
+                    style="font-size: 0.75rem; display: flex; align-items: center; justify-content: space-between;">
+                    <span>Kích thước khung ký (RECTANGLESIZE: W,H):</span>
+                  </label>
+                  <input type="text" id="meta-size" class="form-input" value="170,70" placeholder="170,70 (Rộng,Cao)">
+                  <div class="field-hint">
+                    <i class="fa-solid fa-vector-square"></i> Đơn vị point (W,H). Tự động co chữ & ngắt dòng vừa khung
+                    ký
+                  </div>
+                </div>
+                <div class="form-group" style="margin-bottom: 10px;">
+                  <label class="form-label" style="font-size: 0.75rem;">Lý do ký (SIGNREASON):</label>
+                  <input type="text" id="meta-reason" class="form-input" value=""
+                    placeholder="(Tùy chọn) Ví dụ: Đồng ý nghiệm thu">
+                </div>
+                <div class="form-group" style="margin-bottom: 10px;">
+                  <label class="form-label" style="font-size: 0.75rem;">Địa điểm (LOCATION):</label>
+                  <input type="text" id="meta-location" class="form-input" value=""
+                    placeholder="(Tùy chọn) Ví dụ: Hà Nội">
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Nút Gửi Ký Số -->
+          <div style="margin-top: auto;">
+            <button class="btn btn-primary btn-lg" id="btn-sign-submit" style="width: 100%;"
+              onclick="app.handleSignFile()">
+              <i class="fa-solid fa-signature"></i> GỬI KÝ SỐ TÀI LIỆU
+            </button>
+          </div>
+        </div>
+
+        <!-- BOX 3: SLIDE QUẢNG CÁO (Đồng bộ giống trang đăng nhập) -->
+        <div class="glass-card box-card" style="padding: 0; overflow: hidden;">
+          <div class="slider-container" id="dashboard-slider"
+            style="height: 100%; border: none; border-radius: var(--radius-lg);">
+            <div class="slider-wrapper" id="dashboard-slider-wrapper">
+              <!-- Dynamic slides rendered here -->
+            </div>
+            <div class="slider-controls">
+              <div class="slider-dots" id="dashboard-slider-dots"></div>
+              <button class="slider-arrow" onclick="sliderDashboard.prev()"><i
+                  class="fa-solid fa-chevron-left"></i></button>
+              <button class="slider-arrow" onclick="sliderDashboard.next()"><i
+                  class="fa-solid fa-chevron-right"></i></button>
+            </div>
+          </div>
+        </div>
+
+        <!-- BOX 2: DANH SÁCH FILE ĐÃ KÝ CỦA UID HIỆN TẠI -->
+        <div class="glass-card box-card box-full-width">
+          <div class="box-header">
+            <div class="box-title">
+              <div class="box-title-icon"><i class="fa-solid fa-folder-open"></i></div>
+              <span>2. Danh Sách Tài Liệu Đã Ký Của UID</span>
+              <span class="badge-fmt" id="history-count-badge"
+                style="background: rgba(16,185,129,0.2); color: #6ee7b7;">0 tài liệu</span>
+            </div>
+            <div class="box-header-actions">
+              <input type="text" id="history-search" class="form-input" placeholder="Tìm kiếm tài liệu..."
+                oninput="app.filterHistory()">
+              <button class="btn btn-secondary btn-sm" onclick="app.loadHistory()" title="Làm mới danh sách">
+                <i class="fa-solid fa-rotate"></i> Làm mới
+              </button>
+            </div>
+          </div>
+
+          <!-- History Table -->
+          <div class="table-container">
+            <table class="data-table" id="history-table">
+              <thead>
+                <tr>
+                  <th style="width: 50px;">STT</th>
+                  <th>Tên Tài Liệu Đã Ký</th>
+                  <th style="width: 110px;">Định Dạng</th>
+                  <th style="width: 160px;">Thời Gian Ký</th>
+                  <th style="width: 140px;">Mã Bill / CA</th>
+                  <th style="width: 120px;">Trạng Thái</th>
+                  <th style="width: 200px; text-align: right;">Thao Tác</th>
+                </tr>
+              </thead>
+              <tbody id="history-tbody">
+                <!-- Rows rendered via JavaScript -->
+              </tbody>
+            </table>
+
+            <!-- Empty State -->
+            <div class="empty-state" id="history-empty" style="display: none;">
+              <div class="empty-icon"><i class="fa-regular fa-folder-open"></i></div>
+              <h3>Chưa có tài liệu nào được ký</h3>
+              <p>Hãy tải lên tài liệu ở Box 1 và nhấn "Gửi ký số" để bắt đầu.</p>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ===================================================================
+         VIEW 3: SETTINGS PAGE (Cấu hình Program.cs & DemoFunction.cs)
+         =================================================================== -->
+    <section id="view-settings" class="view-section">
+      <div class="glass-card" style="max-width: 1000px; margin: 0 auto;">
+        <div class="box-header">
+          <div class="box-title">
+            <div class="box-title-icon"><i class="fa-solid fa-sliders"></i></div>
+            <span>Cấu Hình Tham Số Hệ Thống (Program.cs)</span>
+          </div>
+          <button class="btn btn-outline btn-sm" onclick="app.closeSettings()">
+            <i class="fa-solid fa-arrow-left"></i> Quay lại
+          </button>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <div class="settings-tabs">
+          <button class="settings-tab-btn active" onclick="app.switchSettingsTab('tab-rssp', this)">
+            <i class="fa-solid fa-server"></i> 1. Kết Nối RSSP eSignCloud
+          </button>
+          <button class="settings-tab-btn" onclick="app.switchSettingsTab('tab-metadata', this)">
+            <i class="fa-solid fa-stamp"></i> 2. Tham Số Chữ Ký (Metadata)
+          </button>
+          <button class="settings-tab-btn" onclick="app.switchSettingsTab('tab-slides', this)">
+            <i class="fa-solid fa-images"></i> 3. Quản Lý Slide Quảng Cáo
+          </button>
+          <button class="settings-tab-btn" onclick="app.switchSettingsTab('tab-uids', this)">
+            <i class="fa-solid fa-users-gear"></i> 4. Danh Bạ UID Người Ký (Admin)
+          </button>
+        </div>
+
+        <!-- TAB 1: RSSP CONNECTIVITY -->
+        <div id="tab-rssp" class="settings-tab-content active">
+          <div class="form-group">
+            <label class="form-label">REST_URL (Địa chỉ RSSP REST API):</label>
+            <input type="text" id="cfg-rest-url" class="form-input"
+              placeholder="https://rssp.mobile-id.vn/eSignCloud/restapi/">
+          </div>
+
+          <div class="form-grid-3">
+            <div class="form-group">
+              <label class="form-label">relyingParty:</label>
+              <input type="text" id="cfg-rp" class="form-input" placeholder="RSSP">
+            </div>
+            <div class="form-group">
+              <label class="form-label">relyingPartyUser:</label>
+              <input type="text" id="cfg-rp-user" class="form-input" placeholder="rsspdemo">
+            </div>
+            <div class="form-group">
+              <label class="form-label">relyingPartyPassword:</label>
+              <input type="password" id="cfg-rp-pwd" class="form-input" placeholder="12345678">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">relyingPartySignature (Base64 PKCS#1 Signature):</label>
+            <textarea id="cfg-rp-sig" class="form-input" rows="3"
+              style="font-family: monospace; font-size: 0.8rem;"></textarea>
+          </div>
+
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label class="form-label">relyingPartyKeyStore (Đường dẫn Keystore .p12):</label>
+              <div style="display: flex; gap: 8px;">
+                <input type="text" id="cfg-rp-keystore" class="form-input" placeholder="file/rssp.p12">
+                <button type="button" class="btn btn-secondary btn-sm"
+                  onclick="document.getElementById('keystore-file-input').click()">
+                  <i class="fa-solid fa-upload"></i> Chọn .p12
+                </button>
+                <input type="file" id="keystore-file-input" style="display: none;" accept=".p12,.pfx"
+                  onchange="app.uploadKeystoreFile(event)">
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">relyingPartyKeyStorePassword:</label>
+              <input type="password" id="cfg-rp-keystore-pwd" class="form-input" placeholder="12345678">
+            </div>
+          </div>
+
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label class="form-label">CERTIFICATEPROFILE:</label>
+              <input type="text" id="cfg-cert-profile" class="form-input" placeholder="PERS.1D">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Thư mục lưu trữ file (FileDirectory):</label>
+              <input type="text" id="cfg-file-dir" class="form-input" placeholder="storage/">
+            </div>
+          </div>
+
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label class="form-label">Default Agreement UUID (UID mặc định):</label>
+              <input type="text" id="cfg-default-uid" class="form-input"
+                placeholder="562449E1-090C-4573-B978-76A740B9F50A">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Default Passcode (Passcode mặc định):</label>
+              <input type="password" id="cfg-default-passcode" class="form-input" placeholder="12345678">
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 2: SIGNING METADATA -->
+        <div id="tab-metadata" class="settings-tab-content">
+          <!-- Guide Box for Alignment and Sizing -->
+          <div class="info-guide-box">
+            <div class="guide-title"><i class="fa-solid fa-circle-info"></i> Quy ước Căn lề Tọa độ & Kích thước khung
+              ký:</div>
+            <ul class="guide-list">
+              <li><b>Điểm gốc căn lề (Anchor):</b> Căn từ <b>góc dưới bên trái</b> của từ khóa định vị
+                (<code>POSITIONIDENTIFIER</code>).</li>
+              <li><b>Độ lệch tọa độ (<code>RECTANGLEOFFSET: X,Y</code>):</b>
+                <span><b>X (Ngang):</b> Số dương (<code>+</code>) dịch sang <b>Phải</b>, số âm (<code>-</code>) dịch
+                  sang <b>Trái</b>.</span>
+                <span><b>Y (Dọc):</b> Số dương (<code>+</code>) dịch lên <b>Trên</b>, số âm (<code>-</code>) dịch xuống
+                  <b>Dưới</b>.</span>
+                <span>(Ví dụ: <code>-30,-100</code> dịch sang trái 30pt và hạ xuống 100pt để đặt khung ký dưới tiêu đề
+                  "ĐẠI DIỆN BÊN B").</span>
+              </li>
+              <li><b>Kích thước khung ký (<code>RECTANGLESIZE: W,H</code>):</b> Định dạng <code>Rộng,Cao</code> (Point).
+                Đã tích hợp tính năng tự động co giãn font chữ và ngắt dòng, <b>không bao giờ bị tràn/vượt chữ ra ngoài
+                  khung ký</b>.</li>
+            </ul>
+          </div>
+
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label class="form-label">Số trang ký (PAGENO):</label>
+              <input type="text" id="cfg-meta-pageno" class="form-input" placeholder="-1 (Trang cuối) hoặc 1, 2...">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Từ khóa vị trí ký (POSITIONIDENTIFIER):</label>
+              <input type="text" id="cfg-meta-posid" class="form-input" placeholder="ĐẠI DIỆN BÊN B">
+            </div>
+          </div>
+
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label class="form-label">Độ lệch tọa độ (RECTANGLEOFFSET: X,Y):</label>
+              <input type="text" id="cfg-meta-offset" class="form-input" placeholder="-30,-100">
+              <div class="field-hint">X: Trái (-) / Phải (+), Y: Dưới (-) / Trên (+) tính từ góc dưới-trái từ khóa</div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Kích thước khung ký (RECTANGLESIZE: W,H):</label>
+              <input type="text" id="cfg-meta-size" class="form-input" placeholder="170,70">
+              <div class="field-hint">Đơn vị point (W,H). Tự động căn chỉnh chữ vừa vặn không bị tràn khung</div>
+            </div>
+          </div>
+
+          <div class="form-grid-3">
+            <div class="form-group">
+              <label class="form-label">Hiển thị chữ ký (VISIBLESIGNATURE):</label>
+              <select id="cfg-meta-visible" class="form-input">
+                <option value="True">True (Hiển thị)</option>
+                <option value="False">False (Ký ẩn)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Màu chữ (TEXTCOLOR):</label>
+              <select id="cfg-meta-color" class="form-input">
+                <option value="black">Đen (Black)</option>
+                <option value="blue">Xanh dương (Blue)</option>
+                <option value="red">Đỏ (Red)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Hướng chữ (TEXTDIRECTION):</label>
+              <select id="cfg-meta-direction" class="form-input">
+                <option value="LEFTTORIGHT">Trái sang Phải (LEFTTORIGHT)</option>
+                <option value="RIGHTTOLEFT">Phải sang Trái (RIGHTTOLEFT)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label class="form-label">Tiền tố thông tin người ký (SIGNERINFOPREFIX):</label>
+              <input type="text" id="cfg-meta-signer-prefix" class="form-input" placeholder="Ký bởi:">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Tiền tố ngày ký (DATETIMEPREFIX):</label>
+              <input type="text" id="cfg-meta-date-prefix" class="form-input" placeholder="Ký ngày:">
+            </div>
+          </div>
+
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label class="form-label">Lý do ký mặc định (SIGNREASON):</label>
+              <input type="text" id="cfg-meta-reason" class="form-input" placeholder="Tôi đồng ý">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Địa điểm ký mặc định (LOCATION):</label>
+              <input type="text" id="cfg-meta-location" class="form-input" placeholder="Hồ Chí Minh">
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 3: SLIDES MANAGEMENT -->
+        <div id="tab-slides" class="settings-tab-content">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <div>
+              <h4 style="font-size: 1rem; color: #f8fafc; margin-bottom: 4px;">Quản Lý Slide Quảng Cáo & Banner</h4>
+              <p style="color: var(--text-secondary); font-size: 0.85rem; margin: 0;">
+                Quản lý các slide quảng cáo và banner hiển thị trên Trang Đăng nhập và Box 3 của Dashboard.
+              </p>
+            </div>
+            <button type="button" class="btn btn-primary btn-sm" onclick="app.addSlide()">
+              <i class="fa-solid fa-plus"></i> Thêm Slide Mới
+            </button>
+          </div>
+          <div id="slides-editor-container">
+            <!-- Slide cards rendered dynamically -->
+          </div>
+        </div>
+
+        <!-- TAB 4: UID DIRECTORY MANAGEMENT -->
+        <div id="tab-uids" class="settings-tab-content">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <div>
+              <h4 style="font-size: 1rem; color: #f8fafc; margin-bottom: 4px;">Danh Bạ Quản Trị UID & Chứng Thư Số</h4>
+              <p style="color: var(--text-secondary); font-size: 0.85rem;">Quản lý danh sách các `agreementUUID`, thông
+                tin người ký nội bộ và kiểm tra trạng thái chứng thư RSSP.</p>
+            </div>
+            <button type="button" class="btn btn-primary btn-sm" onclick="app.openAddUidModal()">
+              <i class="fa-solid fa-plus"></i> Thêm UID Mới
+            </button>
+          </div>
+
+          <div class="table-container">
+            <table class="data-table" id="uids-table">
+              <thead>
+                <tr>
+                  <th style="width: 40px;">STT</th>
+                  <th>Người Ký / Đơn Vị</th>
+                  <th>agreementUUID (UID)</th>
+                  <th>Phòng Ban / Email</th>
+                  <th>Passcode Mặc Định</th>
+                  <th>Trạng Thái</th>
+                  <th style="width: 220px; text-align: right;">Thao Tác</th>
+                </tr>
+              </thead>
+              <tbody id="uids-tbody">
+                <!-- Accounts rendered via JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Settings Action Buttons (Fixed Floating Bottom Bar) -->
+        <div class="settings-actions-wrapper">
+          <div class="settings-actions">
+            <div>
+              <button type="button" class="btn btn-secondary btn-sm" onclick="app.testConnection()">
+                <i class="fa-solid fa-bolt"></i> Kiểm tra Keystore (.p12)
+              </button>
+              <button type="button" class="btn btn-outline btn-sm" onclick="app.resetConfig()">
+                <i class="fa-solid fa-arrow-rotate-left"></i> Khôi phục mặc định
+              </button>
+            </div>
+            <button type="button" class="btn btn-primary" onclick="app.saveConfig()">
+              <i class="fa-solid fa-floppy-disk"></i> Lưu Cấu Hình
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+  </div>
+
+  <!-- ===================================================================
+       MODAL DIALOGS
+       =================================================================== -->
+
+  <!-- Modal: Xem trước file PDF (PDF Preview) -->
+  <div class="modal-overlay" id="modal-preview">
+    <div class="modal-card modal-lg">
+      <div class="modal-header">
+        <h3 id="modal-preview-title"><i class="fa-regular fa-file-pdf"></i> Xem Trước Tài Liệu Đã Ký</h3>
+        <button class="modal-close" onclick="app.closeModal('modal-preview')">&times;</button>
+      </div>
+      <div class="modal-body" style="padding: 0;">
+        <iframe id="preview-iframe" class="preview-iframe" src="about:blank"></iframe>
+      </div>
+      <div class="modal-footer">
+        <a id="modal-preview-download-btn" href="#" class="btn btn-primary btn-sm" download>
+          <i class="fa-solid fa-download"></i> Tải Về Máy
+        </a>
+        <button class="btn btn-secondary btn-sm" onclick="app.closeModal('modal-preview')">Đóng</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Thông tin Chứng thư số (Certificate Details) -->
+  <div class="modal-overlay" id="modal-cert">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-certificate" style="color: var(--accent);"></i> Chi Tiết Chứng Thư Số</h3>
+        <button class="modal-close" onclick="app.closeModal('modal-cert')">&times;</button>
+      </div>
+      <div class="modal-body" id="modal-cert-body">
+        <!-- Details injected via JS -->
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary btn-sm" onclick="app.closeModal('modal-cert')">Đóng</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Đổi Passcode (Change Passcode) -->
+  <div class="modal-overlay" id="modal-change-passcode">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-key"></i> Đổi Passcode Ký Số</h3>
+        <button class="modal-close" onclick="app.closeModal('modal-change-passcode')">&times;</button>
+      </div>
+      <form onsubmit="app.handleChangePasscode(event)">
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label">UID (agreementUUID):</label>
+            <input type="text" id="change-uid" class="form-input" required placeholder="agreementUUID">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Passcode hiện tại:</label>
+            <input type="password" id="change-old-pwd" class="form-input" required placeholder="Nhập Passcode cũ">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Passcode mới:</label>
+            <input type="password" id="change-new-pwd" class="form-input" required placeholder="Nhập Passcode mới">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary btn-sm"
+            onclick="app.closeModal('modal-change-passcode')">Hủy</button>
+          <button type="submit" class="btn btn-primary btn-sm">Xác Nhận Đổi Passcode</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Quên Passcode (Forgot Passcode) -->
+  <div class="modal-overlay" id="modal-forget-passcode">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-unlock-keyhole"></i> Quên Passcode Ký Số</h3>
+        <button class="modal-close" onclick="app.closeModal('modal-forget-passcode')">&times;</button>
+      </div>
+      <form onsubmit="app.handleForgetPasscode(event)">
+        <div class="modal-body">
+          <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 16px;">
+            Hệ thống sẽ gửi thông tin khôi phục Passcode đến số điện thoại hoặc email đã đăng ký với UID của bạn.
+          </p>
+          <div class="form-group">
+            <label class="form-label">UID (agreementUUID):</label>
+            <input type="text" id="forget-uid" class="form-input" required placeholder="Nhập agreementUUID">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary btn-sm"
+            onclick="app.closeModal('modal-forget-passcode')">Hủy</button>
+          <button type="submit" class="btn btn-primary btn-sm">Gửi Yêu Cầu Khôi Phục</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Thêm / Chỉnh Sửa UID Người Ký (Admin) -->
+  <div class="modal-overlay" id="modal-add-uid">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="modal-uid-title"><i class="fa-solid fa-user-plus"></i> Thêm Tài Khoản UID Mới</h3>
+        <button class="modal-close" onclick="app.closeModal('modal-add-uid')">&times;</button>
+      </div>
+      <form onsubmit="app.handleSaveUid(event)">
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label">agreementUUID (Mã UID):</label>
+            <input type="text" id="uid-input-uuid" class="form-input" required
+              placeholder="Ví dụ: 562449E1-090C-4573-B978-76A740B9F50A">
+          </div>
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label class="form-label">Tên người ký / Chủ sở hữu:</label>
+              <input type="text" id="uid-input-name" class="form-input" required placeholder="Ví dụ: Nguyễn Văn A">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Phòng ban / Đơn vị:</label>
+              <input type="text" id="uid-input-dept" class="form-input" placeholder="Ví dụ: Ban Giám Đốc">
+            </div>
+          </div>
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label class="form-label">Email:</label>
+              <input type="email" id="uid-input-email" class="form-input" placeholder="email@icorp.vn">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Số điện thoại:</label>
+              <input type="text" id="uid-input-phone" class="form-input" placeholder="0901234567">
+            </div>
+          </div>
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label class="form-label">Passcode mặc định:</label>
+              <input type="password" id="uid-input-passcode" class="form-input" value="12345678" placeholder="12345678">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Trạng thái:</label>
+              <select id="uid-input-status" class="form-input">
+                <option value="Hoạt động">Hoạt động</option>
+                <option value="Tạm khóa">Tạm khóa</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary btn-sm" onclick="app.closeModal('modal-add-uid')">Hủy</button>
+          <button type="submit" class="btn btn-primary btn-sm">Lưu Tài Khoản UID</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <!-- Scripts -->
+  <script src="js/app.js"></script>
+</body>
+
+</html>

@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?><DKyThueDTu xmlns="http://kekhaithue.gdt.gov.vn/HSoDKy" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+	<DKyThue id="id-836a41b0-2c34-422f-ab5b-646963e41ac9">
+		<TTinChung>
+			<CQT>
+				<maCQT>10101</maCQT>
+				<tenCQT/>
+				<DVu>
+					<maDVu>00008</maDVu>
+					<tenDVu>TAX.VN - Ký điện tử</tenDVu>
+					<soGPhepKDoanh/>
+				</DVu>
+			</CQT>
+			<TTinDKyThue>
+				<maDKy>220</maDKy>
+				<mauDKy/>
+				<tenDKy>Đăng ký thêm tờ khai T-VAN</tenDKy>
+				<pBanDKy>2.0.9</pBanDKy>
+				<ngayDKy>2020-03-10</ngayDKy>
+				<tIN>0101243150-999</tIN>
+				<tenNNT>T-VAN</tenNNT>
+			</TTinDKyThue>
+		</TTinChung>
+		<NDungDKy>
+			<ten_T_VAN>TAX</ten_T_VAN>
+			<DSachHSoDKyNop>
+				<NoiDungChiTiet id="ID_1">
+					<maHSo>01</maHSo>
+					<tenHSo>Tờ khai GTGT khấu trừ (01/GTGT) theo quý</tenHSo>
+					<kyBDau>Q1/2020</kyBDau>
+				</NoiDungChiTiet>
+				<NoiDungChiTiet id="ID_2">
+					<maHSo>01</maHSo>
+					<tenHSo>Tờ khai GTGT khấu trừ (01/GTGT) theo tháng</tenHSo>
+					<kyBDau>02/2020</kyBDau>
+				</NoiDungChiTiet>
+			</DSachHSoDKyNop>
+		</NDungDKy>
+	<Signature xmlns="http://www.w3.org/2000/09/xmldsig#" Id="Signature-f5475920-ff64-416c-bce1-f1e5a13d43a8"><SignedInfo><CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"/><SignatureMethod Algorithm="http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"/><Reference URI="#id-836a41b0-2c34-422f-ab5b-646963e41ac9"><Transforms><Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"/></Transforms><DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/><DigestValue>Oapv4EGJ3eaQUxvi27i2OG13Hkbe6sQ3enpLfsUHmKg=</DigestValue></Reference><Reference URI="#TimeStamp"><DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/><DigestValue>Ntm+u4hpDtbYT4nUgvih3oFotGuPcfBr+JJuP10hfMs=</DigestValue></Reference></SignedInfo><SignatureValue>id8Q8CW87XWZbf9oZAmVkcnlAxYMIBxfWSud09W2olSV0DTiS0d5n58rl02QgeEMha1OkFce0kBD7wHrqzYApu0S3qofo7iU7hKVKkIHfyhLsoZt4NyH1waiz2OYmb20f2El+vEqOP3MOzbKBjuZ5PV6nNipeulmc3xq6NP4r0e5R13MriZPdiheyx2kPBqGVHvRGFW4e2FVGAnVKly+GIPPA6R5AhTSD8jaNboLLOmnYR7K/erok2F/SiL3Q13dlvSrPKFzRILuw0I9fZvlGl+W4tqi1duhm15/AMWQ0pYkwLiUBClJ1YAPdUhrBoBIwmjn865ODOqmK8AK2rH+aQ==</SignatureValue><KeyInfo><X509Data><X509SubjectName>C=VN,ST=HÀ NỘI,O=DEMO DIGITAL SIGNATURE RSSP ICORP - BK,CN=DEMO DIGITAL SIGNATURE RSSP ICORP - BK,UID=MST:123456789</X509SubjectName><X509Certificate>MIIE9zCCA9+gAwIBAgIMSqGfLuccSC5Xbys9MA0GCSqGSIb3DQEBBQUAMG4xJDAiBgNVBAMMG0ZQVCBDZXJ0aWZpY2F0aW9uIEF1dGhvcml0eTEfMB0GA1UECwwWRlBUIEluZm9ybWF0aW9uIFN5c3RlbTEYMBYGA1UECgwPRlBUIENvcnBvcmF0aW9uMQswCQYDVQQGEwJWTjAeFw0yMjExMjgwMjAwMDVaFw0yNDExMjcwMjAwMDVaMIGiMQswCQYDVQQGEwJWTjESMBAGA1UECAwJSMOAIE7hu5hJMS8wLQYDVQQKDCZERU1PIERJR0lUQUwgU0lHTkFUVVJFIFJTU1AgSUNPUlAgLSBCSzEvMC0GA1UEAwwmREVNTyBESUdJVEFMIFNJR05BVFVSRSBSU1NQIElDT1JQIC0gQksxHTAbBgoJkiaJk/IsZAEBDA1NU1Q6MTIzNDU2Nzg5MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAqZlluC1+XokVnrNijOUknmPJUAqMAwQYpbOV34KxqFKRrkVLYPtXX72gabpUbCLLRnIg317eD9i1KGUB0SJJhDe1uLUlpDz92lwb8kHiSJ8x/UMw7H2Gr7eS9+t+hpvV4xf8XWA+TYHaHdsB9LtXIBet5mbzif/BNLWzUdK5yao9SPdODYMbFtAE+tehLkRNnnnycWYD2YTPijHSjJ4Mo8yElz2A2pltoQraSK1N5XsYCGJugBUkcXy7i12oy58/HNtErYQyaWa/3A6+awQ+y85zEUj/NCSvreCtiz2oIIAIB3vcJvhI8wmgN+JWHNQiVy6Tbub0drV1eUdr7/vGwwIDAQABo4IBXjCCAVowDAYDVR0TAQH/BAIwADAfBgNVHSMEGDAWgBQZzArNe5kvU8Am+hXpXTmCQlR8DzA+BggrBgEFBQcBAQQyMDAwLgYIKwYBBQUHMAGGImh0dHA6Ly9tb2JpbGUtaWQudm4vb2NzcC9yZXNwb25kZXIwRQYDVR0gBD4wPDA6BgsrBgEEAYHtAwEEATArMCkGCCsGAQUFBwIBFh1odHRwczovL21vYmlsZS1pZC52bi9jcHMuaHRtbDA0BgNVHSUELTArBggrBgEFBQcDAgYIKwYBBQUHAwQGCisGAQQBgjcKAwwGCSqGSIb3LwEBBTA9BgNVHR8ENjA0MDKgMKAuhixodHRwOi8vbW9iaWxlLWlkLnZuL2NybC9nZXQ/bmFtZT1GUFRfQ0FfU0hBMTAdBgNVHQ4EFgQUX2Y/V8KxcIl0AvHc02MGym/bNK4wDgYDVR0PAQH/BAQDAgTwMA0GCSqGSIb3DQEBBQUAA4IBAQBl4yhip40hFG14yITzb7f0yOIzIMAKFdWPKRSnwDiUFOUr3m/i6h4vG1u5ompG5S6DsXCu8hFD7EsC6JNxXUeCbgawM7znHg1rZM2NGAPJwJTjwzPJsRUFMWRkHE4QDFxKRYJj2A4UGhRHw3U2Lv1G4QtGRqQ/mKaWpk74wQMo4F2nAYuHJeGtlvLgXKLAt+u1HpSjrOnszKNO9Swv8debXf3yfBcXKxzBK/8F3+2W7yTyM1//xNn1TdbRRhvLdVh7euUY4sg/hBh50GrfMA4cYYKYzqm+V5OUlTI7cP84d47fYDPsnTkUXFkszFTaAXu6nopSwMIx2Q3UgNq2eCUM</X509Certificate></X509Data></KeyInfo><Object Id="TimeStamp"><SignatureProperties><SignatureProperty Target="#Signature-f5475920-ff64-416c-bce1-f1e5a13d43a8"><SigningTime>2022-12-02T14:08:35</SigningTime></SignatureProperty></SignatureProperties></Object></Signature></DKyThue>
+	<DKyThue1>
+		<NDungDKy1/>
+	</DKyThue1>
+</DKyThueDTu>
