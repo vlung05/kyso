@@ -357,6 +357,7 @@ class AppController {
     formData.append('passcode', this.passcode);
 
     // Custom metadata overrides
+    formData.append('ALIGNMENT', document.getElementById('meta-alignment') ? document.getElementById('meta-alignment').value : 'center-below');
     formData.append('PAGENO', document.getElementById('meta-pageno').value.trim());
     formData.append('POSITIONIDENTIFIER', document.getElementById('meta-posid').value.trim());
     formData.append('RECTANGLEOFFSET', document.getElementById('meta-offset').value.trim());
@@ -565,6 +566,7 @@ class AppController {
       // Update Quick Defaults for metadata
       if (this.config && this.config.defaultMetadata) {
         const m = this.config.defaultMetadata;
+        if (m.ALIGNMENT && document.getElementById('meta-alignment')) document.getElementById('meta-alignment').value = m.ALIGNMENT;
         if (m.PAGENO) document.getElementById('meta-pageno').value = m.PAGENO;
         if (m.POSITIONIDENTIFIER) document.getElementById('meta-posid').value = m.POSITIONIDENTIFIER;
         if (m.RECTANGLEOFFSET) document.getElementById('meta-offset').value = m.RECTANGLEOFFSET;
@@ -596,9 +598,10 @@ class AppController {
     document.getElementById('cfg-default-passcode').value = c.defaultPassCode || '';
 
     // Tab 2
+    if (document.getElementById('cfg-meta-alignment')) document.getElementById('cfg-meta-alignment').value = m.ALIGNMENT || 'center-below';
     document.getElementById('cfg-meta-pageno').value = m.PAGENO || '1';
     document.getElementById('cfg-meta-posid').value = m.POSITIONIDENTIFIER || '(Ký tên, đóng dấu)';
-    document.getElementById('cfg-meta-offset').value = m.RECTANGLEOFFSET || '-30,-100';
+    document.getElementById('cfg-meta-offset').value = m.RECTANGLEOFFSET || '0,0';
     document.getElementById('cfg-meta-size').value = m.RECTANGLESIZE || '170,70';
     document.getElementById('cfg-meta-visible').value = m.VISIBLESIGNATURE || 'True';
     document.getElementById('cfg-meta-color').value = m.TEXTCOLOR || 'black';
@@ -947,6 +950,14 @@ class AppController {
     await this.saveConfig();
   }
 
+  handleAlignmentChange(alignVal, targetOffsetId) {
+    const el = document.getElementById(targetOffsetId);
+    if (!el) return;
+    if (el.value === '-70,-60' || el.value === '-30,-100' || el.value === '') {
+      el.value = '0,0';
+    }
+  }
+
   async addSlide() {
     this.config.slides = this.config.slides || [];
     const newId = this.config.slides.length + 1;
@@ -998,6 +1009,7 @@ class AppController {
       defaultAgreementUUID: document.getElementById('cfg-default-uid').value.trim(),
       defaultPassCode: document.getElementById('cfg-default-passcode').value.trim(),
       defaultMetadata: {
+        ALIGNMENT: document.getElementById('cfg-meta-alignment') ? document.getElementById('cfg-meta-alignment').value : 'center-below',
         PAGENO: document.getElementById('cfg-meta-pageno').value.trim(),
         POSITIONIDENTIFIER: document.getElementById('cfg-meta-posid').value.trim(),
         RECTANGLEOFFSET: document.getElementById('cfg-meta-offset').value.trim(),

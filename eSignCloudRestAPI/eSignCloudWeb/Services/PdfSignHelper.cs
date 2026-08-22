@@ -9,7 +9,10 @@ using iText.Kernel.Pdf.Canvas;
 using iText.Kernel.Pdf.Canvas.Parser;
 using iText.Kernel.Pdf.Canvas.Parser.Data;
 using iText.Kernel.Pdf.Canvas.Parser.Listener;
+using iText.Kernel.Pdf.Extgstate;
+using iText.Kernel.Pdf.Xobject;
 using iText.IO.Font;
+using iText.IO.Image;
 using iText.Signatures;
 using iText.Forms.Form.Element;
 using iText.Layout.Element;
@@ -38,8 +41,9 @@ namespace eSignCloudWeb.Services
             string location,
             string positionIdentifier,
             string pageNoStr = "-1",
-            string offsetStr = "-70,0",
+            string offsetStr = "0,0",
             string sizeStr = "170,70",
+            string alignment = "center-below",
             string? serialNumber = null,
             string? rawCertBase64 = null,
             string? keyStorePath = null,
@@ -47,79 +51,257 @@ namespace eSignCloudWeb.Services
         {
             try
             {
-                // 1. Calculate keyword position and bounding rectangle
-                var (targetPage, signRect) = CalculateSignatureBounds(
+                // 1. Calculate all signature positions across pages (supporting alignment, ALL, *, 1,2,3, 1-5, -1, etc.)
+                var positions = CalculateAllSignatureBounds(
                     sourcePdfBytes,
                     reason,
                     location,
                     positionIdentifier,
                     pageNoStr,
                     offsetStr,
-                    sizeStr);
+                    sizeStr,
+                    alignment);
 
-                // 2. Embed cryptographic PAdES digital signature with custom SignatureFieldAppearance
-                byte[]? cryptSigned = TryCryptographicSign(
-                    sourcePdfBytes,
-                    signerName,
-                    certDn,
-                    serialNumber,
-                    rawCertBase64,
-                    reason,
-                    location,
-                    targetPage,
-                    signRect,
-                    keyStorePath,
-                    keyStorePassword);
-
-                if (cryptSigned != null && cryptSigned.Length > 0)
+                if (positions == null || positions.Count == 0)
                 {
-                    return cryptSigned;
+                    positions = new List<(int, Rectangle)> { (1, new Rectangle(50, 50, 170, 70)) };
                 }
 
-                // Fallback: visual-only stamp if cryptographic keystore is unavailable
-                return StampFallbackVisual(sourcePdfBytes, targetPage, signRect, signerName, reason, location);
+                // 2. Stamp visual appearances on ALL target positions (1 to N) to ensure 100% identical styling
+                byte[] currentPdf = StampFallbackVisual(sourcePdfBytes, positions, signerName, reason, location);
+
+                // 3. Sequentially embed real cryptographic signatures for EACH position so every page is clickable
+                string timestampStr = DateTime.Now.ToString("yyyyMMddHHmmss");
+                for (int i = 0; i < positions.Count; i++)
+                {
+                    var pos = positions[i];
+                    string sigFieldName = $"Signature_{timestampStr}_{i + 1}";
+                    byte[]? cryptSigned = TryCryptographicSign(
+                        currentPdf,
+                        signerName,
+                        certDn,
+                        serialNumber,
+                        rawCertBase64,
+                        reason,
+                        location,
+                        pos.targetPage,
+                        pos.signRect,
+                        sigFieldName,
+                        keyStorePath,
+                        keyStorePassword);
+
+                    if (cryptSigned != null && cryptSigned.Length > 0)
+                    {
+                        currentPdf = cryptSigned;
+                    }
+                }
+
+                return currentPdf;
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"[PdfSignHelper Error] {ex.Message}");
-                var (targetPage, signRect) = CalculateSignatureBounds(sourcePdfBytes, reason, location, positionIdentifier, pageNoStr, offsetStr, sizeStr);
-                return StampFallbackVisual(sourcePdfBytes, targetPage, signRect, signerName, reason, location);
+                var positions = CalculateAllSignatureBounds(sourcePdfBytes, reason, location, positionIdentifier, pageNoStr, offsetStr, sizeStr, alignment);
+                return StampFallbackVisual(sourcePdfBytes, positions, signerName, reason, location);
             }
         }
 
-        private static (int targetPage, Rectangle signRect) CalculateSignatureBounds(
+        public static List<int> ParsePageRange(string pageNoStr, int totalPages)
+        {
+            if (string.IsNullOrWhiteSpace(pageNoStr) ||
+                string.Equals(pageNoStr.Trim(), "-1", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(pageNoStr.Trim(), "Last", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(pageNoStr.Trim(), "Cuối", StringComparison.OrdinalIgnoreCase))
+            {
+                return new List<int> { totalPages };
+            }
+
+            string clean = pageNoStr.Trim().ToLowerInvariant();
+            if (clean == "all" || clean == "*" || clean == "0" || clean == "tất cả" || clean == "tat ca" || clean == "toàn bộ")
+            {
+                return Enumerable.Range(1, totalPages).ToList();
+            }
+
+            var pages = new HashSet<int>();
+            var tokens = pageNoStr.Split(new[] { ',', ';', ' ' }, StringSplitOptions.RemoveEmptyEntries);
+
+            foreach (var token in tokens)
+            {
+                var t = token.Trim();
+                if (string.IsNullOrEmpty(t)) continue;
+
+                if (t.Contains('-'))
+                {
+                    var rangeParts = t.Split('-');
+                    if (rangeParts.Length == 2 &&
+                        int.TryParse(rangeParts[0].Trim(), out int startP) &&
+                        int.TryParse(rangeParts[1].Trim(), out int endP))
+                    {
+                        int min = Math.Max(1, Math.Min(startP, endP));
+                        int max = Math.Min(totalPages, Math.Max(startP, endP));
+                        for (int i = min; i <= max; i++) pages.Add(i);
+                    }
+                }
+                else if (string.Equals(t, "-1", StringComparison.OrdinalIgnoreCase) ||
+                         string.Equals(t, "Last", StringComparison.OrdinalIgnoreCase))
+                {
+                    pages.Add(totalPages);
+                }
+                else if (int.TryParse(t, out int p) && p >= 1 && p <= totalPages)
+                {
+                    pages.Add(p);
+                }
+            }
+
+            return pages.Count > 0 ? pages.OrderBy(x => x).ToList() : new List<int> { totalPages };
+        }
+
+        private static Rectangle CalculateRectForKeyword(
+            KeywordPositionInfo pos,
+            Rectangle pageSize,
+            float boxWidth,
+            float boxHeight,
+            string alignment,
+            float offX,
+            float offY)
+        {
+            float baseX;
+            float baseY;
+
+            string align = (alignment ?? "center-below").Trim().ToLowerInvariant();
+
+            switch (align)
+            {
+                case "left-below":
+                case "left":
+                    baseX = pos.LeftX;
+                    baseY = pos.BaselineY - boxHeight - 6f;
+                    break;
+
+                case "right-below":
+                case "right":
+                    baseX = pos.RightX - boxWidth;
+                    baseY = pos.BaselineY - boxHeight - 6f;
+                    break;
+
+                case "right-of":
+                case "inline-right":
+                    baseX = pos.RightX + 8f;
+                    baseY = pos.BaselineY - (boxHeight / 2f) + 4f;
+                    break;
+
+                case "left-of":
+                case "inline-left":
+                    baseX = pos.LeftX - boxWidth - 8f;
+                    baseY = pos.BaselineY - (boxHeight / 2f) + 4f;
+                    break;
+
+                case "above":
+                case "center-above":
+                    baseX = pos.CenterX - (boxWidth / 2f);
+                    baseY = pos.TopY + 6f;
+                    break;
+
+                case "center-below":
+                case "center":
+                default:
+                    baseX = pos.CenterX - (boxWidth / 2f);
+                    baseY = pos.BaselineY - boxHeight - 6f;
+                    break;
+            }
+
+            float finalX = baseX + offX;
+            float finalY = baseY + offY;
+
+            finalX = Math.Max(15f, Math.Min(finalX, pageSize.GetWidth() - boxWidth - 15f));
+            finalY = Math.Max(15f, Math.Min(finalY, pageSize.GetHeight() - boxHeight - 15f));
+
+            return new Rectangle(finalX, finalY, boxWidth, boxHeight);
+        }
+
+        private static Rectangle CalculateRectForPage(
+            Rectangle pageSize,
+            float boxWidth,
+            float boxHeight,
+            string alignment,
+            float offX,
+            float offY)
+        {
+            float baseX;
+            float baseY;
+
+            string align = (alignment ?? "bottom-right").Trim().ToLowerInvariant();
+
+            switch (align)
+            {
+                case "bottom-left":
+                    baseX = 40f;
+                    baseY = 60f;
+                    break;
+
+                case "bottom-center":
+                    baseX = (pageSize.GetWidth() - boxWidth) / 2f;
+                    baseY = 60f;
+                    break;
+
+                case "top-right":
+                    baseX = pageSize.GetWidth() - boxWidth - 40f;
+                    baseY = pageSize.GetHeight() - boxHeight - 60f;
+                    break;
+
+                case "top-left":
+                    baseX = 40f;
+                    baseY = pageSize.GetHeight() - boxHeight - 60f;
+                    break;
+
+                case "top-center":
+                    baseX = (pageSize.GetWidth() - boxWidth) / 2f;
+                    baseY = pageSize.GetHeight() - boxHeight - 60f;
+                    break;
+
+                case "center":
+                    baseX = (pageSize.GetWidth() - boxWidth) / 2f;
+                    baseY = (pageSize.GetHeight() - boxHeight) / 2f;
+                    break;
+
+                case "bottom-right":
+                default:
+                    baseX = pageSize.GetWidth() - boxWidth - 40f;
+                    baseY = 60f;
+                    break;
+            }
+
+            float finalX = baseX + offX;
+            float finalY = baseY + offY;
+
+            finalX = Math.Max(15f, Math.Min(finalX, pageSize.GetWidth() - boxWidth - 15f));
+            finalY = Math.Max(15f, Math.Min(finalY, pageSize.GetHeight() - boxHeight - 15f));
+
+            return new Rectangle(finalX, finalY, boxWidth, boxHeight);
+        }
+
+        private static List<(int targetPage, Rectangle signRect)> CalculateAllSignatureBounds(
             byte[] sourcePdfBytes,
             string reason,
             string location,
             string positionIdentifier,
             string pageNoStr,
             string offsetStr,
-            string sizeStr)
+            string sizeStr,
+            string alignment = "center-below")
         {
             using var inStream = new MemoryStream(sourcePdfBytes);
             using var pdfDoc = new PdfDocument(new PdfReader(inStream));
 
             int totalPages = pdfDoc.GetNumberOfPages();
-            int targetPage = totalPages; // Default to last page
-            if (string.Equals(pageNoStr, "-1", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(pageNoStr, "Last", StringComparison.OrdinalIgnoreCase))
-            {
-                targetPage = totalPages;
-            }
-            else if (int.TryParse(pageNoStr, out int p) && p >= 1 && p <= totalPages)
-            {
-                targetPage = p;
-            }
-
-            var page = pdfDoc.GetPage(targetPage);
-            var pageSize = page.GetPageSize();
+            var targetPages = ParsePageRange(pageNoStr, totalPages);
 
             bool hasReason = !string.IsNullOrWhiteSpace(reason);
             bool hasLocation = !string.IsNullOrWhiteSpace(location);
 
             // Default dimensions
             float boxWidth = 170f;
-            float boxHeight = (hasReason && hasLocation) ? 68f : ((hasReason || hasLocation) ? 55f : 42f);
+            float boxHeight = (hasReason && hasLocation) ? 75f : ((hasReason || hasLocation) ? 62f : 50f);
 
             if (!string.IsNullOrWhiteSpace(sizeStr) && sizeStr.Contains(','))
             {
@@ -138,64 +320,122 @@ namespace eSignCloudWeb.Services
                 float.TryParse(parts[1].Trim(), out offY);
             }
 
-            // Search for position keyword on target page
-            float? keywordX = null;
-            float? keywordY = null;
+            var results = new List<(int targetPage, Rectangle signRect)>();
+            bool isAllMode = !string.IsNullOrWhiteSpace(pageNoStr) &&
+                (pageNoStr.Trim().Equals("all", StringComparison.OrdinalIgnoreCase) ||
+                 pageNoStr.Trim().Equals("*") ||
+                 pageNoStr.Trim().Equals("0") ||
+                 pageNoStr.Trim().Equals("tất cả", StringComparison.OrdinalIgnoreCase) ||
+                 pageNoStr.Trim().Equals("tat ca", StringComparison.OrdinalIgnoreCase) ||
+                 pageNoStr.Trim().Equals("toàn bộ", StringComparison.OrdinalIgnoreCase));
 
-            if (!string.IsNullOrWhiteSpace(positionIdentifier))
+            bool hasKeyword = !string.IsNullOrWhiteSpace(positionIdentifier);
+
+            if (hasKeyword)
             {
-                var finder = new KeywordPositionFinder(positionIdentifier.Trim());
-                new PdfCanvasProcessor(finder).ProcessPageContent(page);
+                string kw = positionIdentifier.Trim();
 
-                if (finder.FoundX.HasValue && finder.FoundY.HasValue)
+                if (isAllMode)
                 {
-                    keywordX = finder.FoundX.Value;
-                    keywordY = finder.FoundY.Value;
+                    // Scan all pages in the PDF for keyword matches
+                    for (int pg = 1; pg <= totalPages; pg++)
+                    {
+                        var page = pdfDoc.GetPage(pg);
+                        var pageSize = page.GetPageSize();
+                        var finder = new KeywordPositionFinder(kw);
+                        new PdfCanvasProcessor(finder).ProcessPageContent(page);
+
+                        if (finder.FoundPositions.Count > 0)
+                        {
+                            foreach (var pos in finder.FoundPositions)
+                            {
+                                results.Add((pg, CalculateRectForKeyword(pos, pageSize, boxWidth, boxHeight, alignment, offX, offY)));
+                            }
+                        }
+                    }
+
+                    // If keyword not found on any page, fallback to page-based alignment on all target pages
+                    if (results.Count == 0)
+                    {
+                        foreach (int pg in targetPages)
+                        {
+                            var page = pdfDoc.GetPage(pg);
+                            var pageSize = page.GetPageSize();
+                            results.Add((pg, CalculateRectForPage(pageSize, boxWidth, boxHeight, alignment, offX, offY)));
+                        }
+                    }
                 }
                 else
                 {
-                    for (int pg = totalPages; pg >= 1; pg--)
+                    // Specific target pages (e.g. 1, 2, 3 or -1)
+                    foreach (int pg in targetPages)
                     {
-                        if (pg == targetPage) continue;
-                        var pFinder = new KeywordPositionFinder(positionIdentifier.Trim());
-                        new PdfCanvasProcessor(pFinder).ProcessPageContent(pdfDoc.GetPage(pg));
-                        if (pFinder.FoundX.HasValue && pFinder.FoundY.HasValue)
+                        var page = pdfDoc.GetPage(pg);
+                        var pageSize = page.GetPageSize();
+                        var finder = new KeywordPositionFinder(kw);
+                        new PdfCanvasProcessor(finder).ProcessPageContent(page);
+
+                        if (finder.FoundPositions.Count > 0)
                         {
-                            targetPage = pg;
-                            page = pdfDoc.GetPage(targetPage);
-                            pageSize = page.GetPageSize();
-                            keywordX = pFinder.FoundX.Value;
-                            keywordY = pFinder.FoundY.Value;
-                            break;
+                            foreach (var pos in finder.FoundPositions)
+                            {
+                                results.Add((pg, CalculateRectForKeyword(pos, pageSize, boxWidth, boxHeight, alignment, offX, offY)));
+                            }
+                        }
+                        else
+                        {
+                            // If user specifically requested page -1 / Last page and keyword is on another page, find it
+                            if (targetPages.Count == 1 && (pageNoStr.Trim() == "-1" || pageNoStr.Trim().Equals("last", StringComparison.OrdinalIgnoreCase)))
+                            {
+                                bool foundElsewhere = false;
+                                for (int otherPg = totalPages; otherPg >= 1; otherPg--)
+                                {
+                                    if (otherPg == pg) continue;
+                                    var otherFinder = new KeywordPositionFinder(kw);
+                                    new PdfCanvasProcessor(otherFinder).ProcessPageContent(pdfDoc.GetPage(otherPg));
+                                    if (otherFinder.FoundPositions.Count > 0)
+                                    {
+                                        var otherPageSize = pdfDoc.GetPage(otherPg).GetPageSize();
+                                        foreach (var pos in otherFinder.FoundPositions)
+                                        {
+                                            results.Add((otherPg, CalculateRectForKeyword(pos, otherPageSize, boxWidth, boxHeight, alignment, offX, offY)));
+                                        }
+                                        foundElsewhere = true;
+                                        break;
+                                    }
+                                }
+
+                                if (foundElsewhere) break;
+                            }
+
+                            // Standard page alignment position on this page
+                            results.Add((pg, CalculateRectForPage(pageSize, boxWidth, boxHeight, alignment, offX, offY)));
                         }
                     }
                 }
             }
-
-            float finalX;
-            float finalY;
-
-            if (keywordX.HasValue && keywordY.HasValue)
-            {
-                finalX = keywordX.Value + offX;
-                finalY = keywordY.Value - boxHeight - 8f + offY;
-            }
             else
             {
-                finalX = pageSize.GetWidth() - boxWidth - 50f + offX;
-                finalY = 80f + offY;
+                // No keyword specified: place by page alignment on all target pages
+                foreach (int pg in targetPages)
+                {
+                    var page = pdfDoc.GetPage(pg);
+                    var pageSize = page.GetPageSize();
+                    results.Add((pg, CalculateRectForPage(pageSize, boxWidth, boxHeight, alignment, offX, offY)));
+                }
             }
 
-            finalX = Math.Max(15f, Math.Min(finalX, pageSize.GetWidth() - boxWidth - 15f));
-            finalY = Math.Max(15f, Math.Min(finalY, pageSize.GetHeight() - boxHeight - 15f));
+            if (results.Count == 0)
+            {
+                results.Add((totalPages, new Rectangle(50, 50, boxWidth, boxHeight)));
+            }
 
-            return (targetPage, new Rectangle(finalX, finalY, boxWidth, boxHeight));
+            return results;
         }
 
         private static byte[] StampFallbackVisual(
             byte[] sourcePdfBytes,
-            int targetPage,
-            Rectangle signRect,
+            List<(int targetPage, Rectangle signRect)> positions,
             string signerName,
             string reason,
             string location)
@@ -204,12 +444,32 @@ namespace eSignCloudWeb.Services
             using var outStream = new MemoryStream();
             using var pdfDoc = new PdfDocument(new PdfReader(inStream), new PdfWriter(outStream));
 
-            var page = pdfDoc.GetPage(targetPage);
-            var canvas = new PdfCanvas(page);
-            DrawSignatureCardOnCanvas(canvas, signRect.GetX(), signRect.GetY(), signRect.GetWidth(), signRect.GetHeight(), signerName, reason, location);
+            int total = pdfDoc.GetNumberOfPages();
+            foreach (var (targetPage, signRect) in positions)
+            {
+                if (targetPage >= 1 && targetPage <= total)
+                {
+                    var page = pdfDoc.GetPage(targetPage);
+                    var canvas = new PdfCanvas(page);
+                    DrawSignatureCardOnCanvas(canvas, signRect.GetX(), signRect.GetY(), signRect.GetWidth(), signRect.GetHeight(), signerName, reason, location);
+                }
+            }
 
             pdfDoc.Close();
             return outStream.ToArray();
+        }
+
+        public static string? GetGreenTickImagePath()
+        {
+            string[] candidateImgPaths = new[] {
+                System.IO.Path.Combine("wwwroot", "assets", "greentick.png"),
+                System.IO.Path.Combine("assets", "greentick.png"),
+                System.IO.Path.Combine(AppContext.BaseDirectory, "wwwroot", "assets", "greentick.png"),
+                System.IO.Path.Combine(AppContext.BaseDirectory, "assets", "greentick.png"),
+                System.IO.Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "assets", "greentick.png"),
+                System.IO.Path.Combine(Directory.GetCurrentDirectory(), "eSignCloudWeb", "wwwroot", "assets", "greentick.png")
+            };
+            return candidateImgPaths.FirstOrDefault(System.IO.File.Exists);
         }
 
         private static void DrawSignatureCardOnCanvas(
@@ -234,6 +494,29 @@ namespace eSignCloudWeb.Services
             canvas.SetFillColor(new DeviceRgb(37, 99, 235)); // #2563eb
             canvas.Rectangle(startX, startY, 3.5f, boxHeight);
             canvas.Fill();
+
+            // 2. Draw Green Tick Image as centered background watermark (opacity 0.28)
+            string? tickImgPath = GetGreenTickImagePath();
+            if (!string.IsNullOrEmpty(tickImgPath) && System.IO.File.Exists(tickImgPath))
+            {
+                try
+                {
+                    var imgData = ImageDataFactory.Create(tickImgPath);
+                    float bgImgSize = Math.Min(boxWidth * 0.65f, boxHeight * 0.88f);
+                    float bgImgX = startX + (boxWidth - bgImgSize) / 2f;
+                    float bgImgY = startY + (boxHeight - bgImgSize) / 2f;
+
+                    canvas.SaveState();
+                    var gs = new PdfExtGState().SetFillOpacity(0.28f);
+                    canvas.SetExtGState(gs);
+                    canvas.AddImageFittedIntoRectangle(imgData, new Rectangle(bgImgX, bgImgY, bgImgSize, bgImgSize), false);
+                    canvas.RestoreState();
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[DrawCanvasWatermark Error] {ex.Message}");
+                }
+            }
             canvas.RestoreState();
 
             // Load Arial Unicode TrueType fonts
@@ -269,20 +552,23 @@ namespace eSignCloudWeb.Services
             // Box margins and paddings
             float padLeft = 8.5f;
             float padRight = 6.0f;
-            float padTop = 4.0f;
-            float padBottom = 4.0f;
+            float padTop = 3.5f;
+            float padBottom = 3.5f;
 
             float contentWidth = Math.Max(20f, boxWidth - padLeft - padRight);
             float contentHeight = Math.Max(15f, boxHeight - padTop - padBottom);
 
             // Calculate unified font size across all lines
-            float unifiedFontSize = 7.5f;
+            float unifiedFontSize = 7.0f;
             var finalRenderLines = new List<(string text, bool isBold, DeviceRgb color)>();
-            float lineSpacing = 10f;
+            float lineSpacing = 9.5f;
 
-            for (float testSize = 8.0f; testSize >= 4.5f; testSize -= 0.25f)
+            for (float testSize = 7.5f; testSize >= 4.0f; testSize -= 0.25f)
             {
                 var candidateLines = new List<(string text, bool isBold, DeviceRgb color)>();
+
+                // 0. Signature Valid header line
+                candidateLines.Add(("Signature Valid", true, new DeviceRgb(22, 163, 74)));
 
                 // 1. Signer line (wrap if long)
                 var signerWrapped = WrapTextToLines($"Ký bởi: {cleanSigner}", boldFont, testSize, contentWidth);
@@ -320,10 +606,10 @@ namespace eSignCloudWeb.Services
                     }
                 }
 
-                float testLineSpacing = testSize * 1.30f;
+                float testLineSpacing = testSize * 1.25f;
                 float totalHeight = (candidateLines.Count - 1) * testLineSpacing + testSize;
 
-                if (totalHeight <= contentHeight || testSize <= 4.5f)
+                if (totalHeight <= contentHeight || testSize <= 4.0f)
                 {
                     unifiedFontSize = testSize;
                     lineSpacing = (totalHeight > contentHeight && candidateLines.Count > 1)
@@ -418,6 +704,7 @@ namespace eSignCloudWeb.Services
             string location,
             int targetPage,
             Rectangle signRect,
+            string? sigFieldName,
             string? keyStorePath,
             string keyStorePassword)
         {
@@ -595,108 +882,31 @@ namespace eSignCloudWeb.Services
                 var signer = new PdfSigner(reader, outStream, new StampingProperties().UseAppendMode());
 
                 // Unique signature field name
-                string sigFieldName = "Signature_" + DateTime.Now.ToString("yyyyMMddHHmmss");
+                string fieldName = string.IsNullOrWhiteSpace(sigFieldName)
+                    ? "Signature_" + DateTime.Now.ToString("yyyyMMddHHmmss")
+                    : sigFieldName;
 
-                // Load Arial fonts
-                PdfFont font;
-                PdfFont boldFont;
-                string fontPath = "C:/Windows/Fonts/arial.ttf";
-                string boldFontPath = "C:/Windows/Fonts/arialbd.ttf";
-
-                if (File.Exists(boldFontPath))
-                    boldFont = PdfFontFactory.CreateFont(boldFontPath, PdfEncodings.IDENTITY_H);
-                else
-                    boldFont = PdfFontFactory.CreateFont(iText.IO.Font.Constants.StandardFonts.HELVETICA_BOLD);
-
-                if (File.Exists(fontPath))
-                    font = PdfFontFactory.CreateFont(fontPath, PdfEncodings.IDENTITY_H);
-                else
-                    font = PdfFontFactory.CreateFont(iText.IO.Font.Constants.StandardFonts.HELVETICA);
-
-                string cleanSigner = string.IsNullOrWhiteSpace(signerName) ? "" : signerName;
-                string signDate = DateTime.Now.ToString("dd/MM/yyyy HH:mm:ss");
-                bool hasReason = !string.IsNullOrWhiteSpace(reason);
-                bool hasLocation = !string.IsNullOrWhiteSpace(location);
-
-                float unifiedFontSize = 7.5f;
-                if (signRect.GetHeight() < 50f || signRect.GetWidth() < 140f) unifiedFontSize = 6.5f;
-                else if (signRect.GetHeight() >= 80f && signRect.GetWidth() >= 200f) unifiedFontSize = 8.5f;
-
-                // Build custom visual SignatureFieldAppearance (no default iText duplicate text!)
-                var appearance = new SignatureFieldAppearance(sigFieldName);
-
-                var div = new Div()
+                // Transparent SignatureFieldAppearance to prevent iText default text overlay ("Digitally signed by...")
+                var appearance = new SignatureFieldAppearance(fieldName);
+                var emptyDiv = new Div()
                     .SetWidth(UnitValue.CreatePercentValue(100))
-                    .SetHeight(UnitValue.CreatePercentValue(100))
-                    .SetBackgroundColor(ColorConstants.WHITE)
-                    .SetBorder(new SolidBorder(new DeviceRgb(203, 213, 225), 0.8f))
-                    .SetBorderLeft(new SolidBorder(new DeviceRgb(37, 99, 235), 3.5f))
-                    .SetPaddingLeft(7.5f)
-                    .SetPaddingRight(5.0f)
-                    .SetPaddingTop(4.0f)
-                    .SetPaddingBottom(4.0f);
-
-                // 1. Signer Name (Bold, wraps cleanly if long)
-                var pSigner = new Paragraph()
-                    .SetFontSize(unifiedFontSize)
-                    .SetMargin(0)
-                    .SetMultipliedLeading(1.2f);
-                pSigner.Add(new Text("Ký bởi: ").SetFont(boldFont).SetFontColor(new DeviceRgb(37, 99, 235)));
-                pSigner.Add(new Text(cleanSigner).SetFont(boldFont).SetFontColor(new DeviceRgb(15, 23, 42)));
-                div.Add(pSigner);
-
-                // 2. Sign Date (Equal font size)
-                var pDate = new Paragraph()
-                    .SetFontSize(unifiedFontSize)
-                    .SetMarginTop(2.0f)
-                    .SetMarginBottom(0)
-                    .SetMultipliedLeading(1.2f);
-                pDate.Add(new Text("Ký ngày: ").SetFont(boldFont).SetFontColor(new DeviceRgb(100, 116, 139)));
-                pDate.Add(new Text(signDate).SetFont(font).SetFontColor(new DeviceRgb(51, 65, 85)));
-                div.Add(pDate);
-
-                // 3. Optional Reason
-                if (hasReason)
-                {
-                    var pReason = new Paragraph()
-                        .SetFontSize(unifiedFontSize)
-                        .SetMarginTop(2.0f)
-                        .SetMarginBottom(0)
-                        .SetMultipliedLeading(1.2f);
-                    pReason.Add(new Text("Lý do: ").SetFont(boldFont).SetFontColor(new DeviceRgb(100, 116, 139)));
-                    pReason.Add(new Text(reason).SetFont(font).SetFontColor(new DeviceRgb(71, 85, 105)));
-                    div.Add(pReason);
-                }
-
-                // 4. Optional Location
-                if (hasLocation)
-                {
-                    var pLoc = new Paragraph()
-                        .SetFontSize(unifiedFontSize)
-                        .SetMarginTop(2.0f)
-                        .SetMarginBottom(0)
-                        .SetMultipliedLeading(1.2f);
-                    pLoc.Add(new Text("Nơi ký: ").SetFont(boldFont).SetFontColor(new DeviceRgb(100, 116, 139)));
-                    pLoc.Add(new Text(location).SetFont(font).SetFontColor(new DeviceRgb(71, 85, 105)));
-                    div.Add(pLoc);
-                }
-
-                appearance.SetContent(div);
+                    .SetHeight(UnitValue.CreatePercentValue(100));
+                appearance.SetContent(emptyDiv);
 
                 var signerProps = new SignerProperties()
-                    .SetFieldName(sigFieldName)
+                    .SetFieldName(fieldName)
                     .SetPageNumber(targetPage)
                     .SetPageRect(signRect)
                     .SetSignatureAppearance(appearance)
                     .SetSignatureCreator(signerName)
                     .SetContact(signerName);
 
-                if (hasReason)
+                if (!string.IsNullOrWhiteSpace(reason))
                 {
                     signerProps.SetReason(reason);
                 }
 
-                if (hasLocation)
+                if (!string.IsNullOrWhiteSpace(location))
                 {
                     signerProps.SetLocation(location);
                 }
@@ -717,14 +927,26 @@ namespace eSignCloudWeb.Services
         }
     }
 
+    public class KeywordPositionInfo
+    {
+        public float LeftX { get; set; }
+        public float RightX { get; set; }
+        public float BaselineY { get; set; }
+        public float TopY { get; set; }
+        public float CenterX => (LeftX + RightX) / 2f;
+        public float Width => Math.Max(10f, RightX - LeftX);
+        public float Height => Math.Max(10f, TopY - BaselineY);
+    }
+
     /// <summary>
-    /// Finds text position coordinates on PDF canvas
+    /// Finds text position coordinates on PDF canvas supporting multiple occurrences per page
     /// </summary>
     public class KeywordPositionFinder : IEventListener
     {
         private readonly string _keyword;
-        public float? FoundX { get; private set; }
-        public float? FoundY { get; private set; }
+        public List<KeywordPositionInfo> FoundPositions { get; } = new List<KeywordPositionInfo>();
+        public float? FoundX => FoundPositions.Count > 0 ? FoundPositions[0].LeftX : (float?)null;
+        public float? FoundY => FoundPositions.Count > 0 ? FoundPositions[0].BaselineY : (float?)null;
 
         public KeywordPositionFinder(string keyword)
         {
@@ -740,11 +962,31 @@ namespace eSignCloudWeb.Services
                 {
                     // Direct match or partial match
                     if (text.Contains(_keyword, StringComparison.OrdinalIgnoreCase) ||
-                        _keyword.Contains(text, StringComparison.OrdinalIgnoreCase) && text.Length >= 4)
+                        (_keyword.Contains(text, StringComparison.OrdinalIgnoreCase) && text.Length >= 4))
                     {
                         var start = tri.GetBaseline().GetStartPoint();
-                        FoundX = start.Get(0);
-                        FoundY = start.Get(1);
+                        var end = tri.GetBaseline().GetEndPoint();
+                        var ascent = tri.GetAscentLine().GetStartPoint();
+
+                        float leftX = start.Get(0);
+                        float rightX = end.Get(0);
+                        if (rightX <= leftX) rightX = leftX + Math.Max(20f, text.Length * 6f);
+                        float baselineY = start.Get(1);
+                        float topY = ascent.Get(1);
+                        if (topY <= baselineY) topY = baselineY + 12f;
+
+                        // Deduplicate close positions on the same line
+                        bool isDuplicate = FoundPositions.Any(p => Math.Abs(p.BaselineY - baselineY) < 8f && Math.Abs(p.LeftX - leftX) < 25f);
+                        if (!isDuplicate)
+                        {
+                            FoundPositions.Add(new KeywordPositionInfo
+                            {
+                                LeftX = leftX,
+                                RightX = rightX,
+                                BaselineY = baselineY,
+                                TopY = topY
+                            });
+                        }
                     }
                 }
             }

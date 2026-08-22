@@ -213,7 +213,10 @@
                 <div class="form-group" style="margin-bottom: 10px;">
                   <label class="form-label" style="font-size: 0.75rem;">Số trang ký (PAGENO):</label>
                   <input type="text" id="meta-pageno" class="form-input" value="-1"
-                    placeholder="-1 (Trang cuối) hoặc 1, 2...">
+                    placeholder="-1 (Trang cuối), ALL (Tất cả trang), 1,2,3 hoặc 1-5">
+                  <div class="field-hint">
+                    <i class="fa-solid fa-layer-group"></i> <b>-1:</b> Trang cuối • <b>ALL:</b> Mọi trang có từ khóa • <b>1,2,5:</b> Các trang cụ thể • <b>1-4:</b> Dải trang
+                  </div>
                 </div>
                 <div class="form-group" style="margin-bottom: 10px;">
                   <label class="form-label" style="font-size: 0.75rem;">Từ khóa vị trí (POSITIONIDENTIFIER):</label>
@@ -221,15 +224,33 @@
                     placeholder="Ví dụ: ĐẠI DIỆN BÊN B, CHỮ KÝ...">
                 </div>
                 <div class="form-group" style="margin-bottom: 10px;">
+                  <label class="form-label" style="font-size: 0.75rem;">
+                    <span><i class="fa-solid fa-align-center" style="color: var(--accent);"></i> Căn lề vị trí ký (ALIGNMENT):</span>
+                  </label>
+                  <select id="meta-alignment" class="form-input" onchange="app.handleAlignmentChange(this.value, 'meta-offset')">
+                    <option value="center-below" selected>🎯 Căn giữa dưới từ khóa (Chuẩn văn bản)</option>
+                    <option value="left-below">⬅️ Căn lề trái dưới từ khóa</option>
+                    <option value="right-below">➡️ Căn lề phải dưới từ khóa</option>
+                    <option value="right-of">👉 Nằm bên phải từ khóa (Cùng hàng)</option>
+                    <option value="above">⬆️ Nằm phía trên từ khóa</option>
+                    <option value="bottom-right">↘️ Góc dưới bên phải trang</option>
+                    <option value="bottom-left">↙️ Góc dưới bên trái trang</option>
+                    <option value="bottom-center">⬇️ Dưới cùng chính giữa trang</option>
+                    <option value="top-right">↗️ Góc trên bên phải trang</option>
+                    <option value="top-left">↖️ Góc trên bên trái trang</option>
+                    <option value="center">⏺️ Chính giữa trang</option>
+                  </select>
+                  <div class="field-hint">Tự động căn chỉnh vị trí chữ ký theo từ khóa hoặc góc trang</div>
+                </div>
+                <div class="form-group" style="margin-bottom: 10px;">
                   <label class="form-label"
                     style="font-size: 0.75rem; display: flex; align-items: center; justify-content: space-between;">
-                    <span>Độ lệch tọa độ (RECTANGLEOFFSET: X,Y):</span>
+                    <span>Độ lệch tinh chỉnh (RECTANGLEOFFSET: X,Y):</span>
                   </label>
-                  <input type="text" id="meta-offset" class="form-input" value="-70,-60"
-                    placeholder="X,Y (ví dụ: -70,-60 hoặc -30,-100)">
+                  <input type="text" id="meta-offset" class="form-input" value="0,0"
+                    placeholder="X,Y (mặc định: 0,0)">
                   <div class="field-hint">
-                    <i class="fa-solid fa-crosshairs"></i> <b>Căn lề:</b> Góc dưới-trái từ khóa. <b>X:</b> Trái (-) /
-                    Phải (+), <b>Y:</b> Dưới (-) / Trên (+)
+                    <i class="fa-solid fa-crosshairs"></i> Tinh chỉnh thêm (<b>X:</b> Trái - / Phải +, <b>Y:</b> Dưới - / Trên +)
                   </div>
                 </div>
                 <div class="form-group" style="margin-bottom: 10px;">
@@ -462,7 +483,8 @@
           <div class="form-grid-2">
             <div class="form-group">
               <label class="form-label">Số trang ký (PAGENO):</label>
-              <input type="text" id="cfg-meta-pageno" class="form-input" placeholder="-1 (Trang cuối) hoặc 1, 2...">
+              <input type="text" id="cfg-meta-pageno" class="form-input" placeholder="-1 (Trang cuối), ALL (Tất cả trang), 1,2,3 hoặc 1-5">
+              <div class="field-hint">-1: Trang cuối • ALL: Mọi trang có từ khóa • 1,2,5: Chọn trang • 1-4: Dải trang</div>
             </div>
             <div class="form-group">
               <label class="form-label">Từ khóa vị trí ký (POSITIONIDENTIFIER):</label>
@@ -472,10 +494,30 @@
 
           <div class="form-grid-2">
             <div class="form-group">
-              <label class="form-label">Độ lệch tọa độ (RECTANGLEOFFSET: X,Y):</label>
-              <input type="text" id="cfg-meta-offset" class="form-input" placeholder="-30,-100">
-              <div class="field-hint">X: Trái (-) / Phải (+), Y: Dưới (-) / Trên (+) tính từ góc dưới-trái từ khóa</div>
+              <label class="form-label">Căn lề vị trí ký (ALIGNMENT):</label>
+              <select id="cfg-meta-alignment" class="form-input">
+                <option value="center-below" selected>🎯 Căn giữa dưới từ khóa (Chuẩn văn bản)</option>
+                <option value="left-below">⬅️ Căn lề trái dưới từ khóa</option>
+                <option value="right-below">➡️ Căn lề phải dưới từ khóa</option>
+                <option value="right-of">👉 Nằm bên phải từ khóa (Cùng hàng)</option>
+                <option value="above">⬆️ Nằm phía trên từ khóa</option>
+                <option value="bottom-right">↘️ Góc dưới bên phải trang</option>
+                <option value="bottom-left">↙️ Góc dưới bên trái trang</option>
+                <option value="bottom-center">⬇️ Dưới cùng chính giữa trang</option>
+                <option value="top-right">↗️ Góc trên bên phải trang</option>
+                <option value="top-left">↖️ Góc trên bên trái trang</option>
+                <option value="center">⏺️ Chính giữa trang</option>
+              </select>
+              <div class="field-hint">Căn lề chuẩn cho văn bản theo từ khóa hoặc góc trang</div>
             </div>
+            <div class="form-group">
+              <label class="form-label">Độ lệch tinh chỉnh (RECTANGLEOFFSET: X,Y):</label>
+              <input type="text" id="cfg-meta-offset" class="form-input" placeholder="0,0">
+              <div class="field-hint">X: Trái (-) / Phải (+), Y: Dưới (-) / Trên (+) tính từ vị trí căn lề</div>
+            </div>
+          </div>
+
+          <div class="form-grid-2">
             <div class="form-group">
               <label class="form-label">Kích thước khung ký (RECTANGLESIZE: W,H):</label>
               <input type="text" id="cfg-meta-size" class="form-input" placeholder="170,70">

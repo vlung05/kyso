@@ -192,7 +192,7 @@ app.MapPost("/api/sign/upload-and-sign", async (
     var customMeta = new Dictionary<string, string>();
     string[] metaKeys = new[]
     {
-        "PAGENO", "POSITIONIDENTIFIER", "RECTANGLEOFFSET", "RECTANGLESIZE",
+        "ALIGNMENT", "PAGENO", "POSITIONIDENTIFIER", "RECTANGLEOFFSET", "RECTANGLESIZE",
         "VISIBLESIGNATURE", "SHOWSIGNERINFO", "SIGNERINFOPREFIX",
         "SHOWDATETIME", "DATETIMEPREFIX", "SHOWREASON", "SIGNREASON",
         "SHOWLOCATION", "LOCATION", "TEXTCOLOR", "TEXTDIRECTION"
