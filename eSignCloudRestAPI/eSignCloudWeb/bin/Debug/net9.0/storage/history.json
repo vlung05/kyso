@@ -856,5 +856,27 @@
     "Status": "Thành công",
     "Reason": "",
     "Location": ""
+  },
+  {
+    "Id": "f4deb82d838c4c09b084518f7020c65b",
+    "AgreementUUID": "04620565-f30a-4d9b-a2c9-af726933f6ea",
+    "OriginalFileName": "1192b4bb-f6ab-4538-8331-26c4fd4122d6.signed.pdf",
+    "SignedFileName": "1192b4bb-f6ab-4538-8331-26c4fd4122d6.signed.signed.pdf",
+    "MimeType": "application/pdf",
+    "FileSize": 534356,
+    "SignDate": "2026-08-22T15:32:34.8821484+07:00",
+    "BillCode": "BK-260822153001-8901050980-158147",
+    "ResponseCode": 1018,
+    "ResponseMessage": "SUCCESSFULLY. PLEASE CHANGE THE PASSPHRASE",
+    "CertificateDN": "C=VN,ST=Hải Phòng,O=HỘ KINH DOANH PHẠM VĂN DŨNG 1979,CN=HỘ KINH DOANH PHẠM VĂN DŨNG 1979,UID=MST:038079004321",
+    "CertificateSerialNumber": "54011257B82BCACF3C55CD198BF23879",
+    "IssuerDN": "C=VN,O=I-CA,CN=I-CA SHA-256",
+    "ValidFrom": 1787387554882,
+    "ValidTo": 1818923554882,
+    "OriginalFilePath": "E:\\project\\KySo-Icorp\\eSignCloudRestAPI\\eSignCloudWeb\\storage\\uploads\\04620565-f30a-4d9b-a2c9-af726933f6ea\\f4deb82d838c4c09b084518f7020c65b_1192b4bb-f6ab-4538-8331-26c4fd4122d6.signed.pdf",
+    "SignedFilePath": "E:\\project\\KySo-Icorp\\eSignCloudRestAPI\\eSignCloudWeb\\storage\\signed\\04620565-f30a-4d9b-a2c9-af726933f6ea\\f4deb82d838c4c09b084518f7020c65b_1192b4bb-f6ab-4538-8331-26c4fd4122d6.signed.signed.pdf",
+    "Status": "Thành công",
+    "Reason": "",
+    "Location": ""
   }
 ]
