@@ -219,6 +219,56 @@ namespace eSignCloudWeb.Services
             return new Rectangle(finalX, finalY, boxWidth, boxHeight);
         }
 
+        public static string NormalizeForMatch(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text)) return "";
+            string s = text.Replace('\u00A0', ' ')
+                           .Replace('\u200B', ' ')
+                           .Replace('\r', ' ')
+                           .Replace('\n', ' ')
+                           .Replace('\t', ' ');
+            s = System.Text.RegularExpressions.Regex.Replace(s, @"\s*([(),:;.\-])\s*", "$1");
+            s = System.Text.RegularExpressions.Regex.Replace(s, @"\s+", " ");
+            return s.Trim().ToLowerInvariant();
+        }
+
+        public static string ExtractCleanWords(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text)) return "";
+            var sb = new System.Text.StringBuilder();
+            foreach (char c in text)
+            {
+                if (char.IsLetterOrDigit(c))
+                {
+                    sb.Append(char.ToLowerInvariant(c));
+                }
+                else if (char.IsWhiteSpace(c) || c == ',' || c == '.' || c == ';' || c == '-' || c == '(' || c == ')')
+                {
+                    sb.Append(' ');
+                }
+            }
+            return System.Text.RegularExpressions.Regex.Replace(sb.ToString(), @"\s+", " ").Trim();
+        }
+
+        public static bool IsPageMatch(string pageText, string kw)
+        {
+            if (string.IsNullOrWhiteSpace(pageText) || string.IsNullOrWhiteSpace(kw)) return false;
+            if (pageText.IndexOf(kw, StringComparison.OrdinalIgnoreCase) >= 0) return true;
+
+            string normPage = NormalizeForMatch(pageText);
+            string normKw = NormalizeForMatch(kw);
+            if (!string.IsNullOrEmpty(normKw) && normPage.Contains(normKw)) return true;
+
+            string cleanKw = ExtractCleanWords(kw);
+            if (!string.IsNullOrWhiteSpace(cleanKw) && cleanKw.Length >= 4)
+            {
+                string cleanPage = ExtractCleanWords(pageText);
+                if (cleanPage.Contains(cleanKw)) return true;
+            }
+
+            return false;
+        }
+
         private static Rectangle CalculateRectForPage(
             Rectangle pageSize,
             float boxWidth,
@@ -239,6 +289,7 @@ namespace eSignCloudWeb.Services
                     baseY = 60f;
                     break;
 
+                case "center-below":
                 case "bottom-center":
                     baseX = (pageSize.GetWidth() - boxWidth) / 2f;
                     baseY = 60f;
@@ -337,7 +388,7 @@ namespace eSignCloudWeb.Services
 
                 if (isAllMode)
                 {
-                    // Scan all pages in the PDF for exact keyword matches
+                    // Scan all pages in the PDF for keyword matches
                     for (int pg = 1; pg <= totalPages; pg++)
                     {
                         var page = pdfDoc.GetPage(pg);
@@ -345,7 +396,7 @@ namespace eSignCloudWeb.Services
 
                         // Fast text check: skip page if full keyword is not present
                         string pageText = PdfTextExtractor.GetTextFromPage(page);
-                        if (pageText.IndexOf(kw, StringComparison.OrdinalIgnoreCase) < 0)
+                        if (!IsPageMatch(pageText, kw))
                         {
                             continue;
                         }
@@ -399,7 +450,7 @@ namespace eSignCloudWeb.Services
                                     if (otherPg == pg) continue;
                                     var otherPage = pdfDoc.GetPage(otherPg);
                                     string otherPageText = PdfTextExtractor.GetTextFromPage(otherPage);
-                                    if (otherPageText.IndexOf(kw, StringComparison.OrdinalIgnoreCase) < 0) continue;
+                                    if (!IsPageMatch(otherPageText, kw)) continue;
 
                                     var otherFinder = new KeywordPositionFinder(kw);
                                     new PdfCanvasProcessor(otherFinder).ProcessPageContent(otherPage);
@@ -950,13 +1001,22 @@ namespace eSignCloudWeb.Services
         public float Height => Math.Max(10f, TopY - BaselineY);
     }
 
+    public class TextChunk
+    {
+        public string Text { get; set; } = "";
+        public float LeftX { get; set; }
+        public float RightX { get; set; }
+        public float BaselineY { get; set; }
+        public float TopY { get; set; }
+    }
+
     /// <summary>
     /// Finds text position coordinates on PDF canvas supporting multiple occurrences per page
     /// </summary>
     public class KeywordPositionFinder : IEventListener
     {
         private readonly string _keyword;
-        private readonly List<TextRenderInfo> _allTextInfos = new List<TextRenderInfo>();
+        private readonly List<TextChunk> _allChunks = new List<TextChunk>();
         public List<KeywordPositionInfo> FoundPositions { get; } = new List<KeywordPositionInfo>();
         public float? FoundX => FoundPositions.Count > 0 ? FoundPositions[0].LeftX : (float?)null;
         public float? FoundY => FoundPositions.Count > 0 ? FoundPositions[0].BaselineY : (float?)null;
@@ -973,102 +1033,111 @@ namespace eSignCloudWeb.Services
                 string text = tri.GetText();
                 if (!string.IsNullOrWhiteSpace(text))
                 {
-                    _allTextInfos.Add(tri);
+                    var start = tri.GetBaseline().GetStartPoint();
+                    var end = tri.GetBaseline().GetEndPoint();
+                    var ascent = tri.GetAscentLine().GetStartPoint();
+
+                    float leftX = start.Get(0);
+                    float rightX = end.Get(0);
+                    if (rightX <= leftX) rightX = leftX + Math.Max(20f, text.Length * 6f);
+                    float baselineY = start.Get(1);
+                    float topY = ascent.Get(1);
+                    if (topY <= baselineY) topY = baselineY + 12f;
+
+                    _allChunks.Add(new TextChunk
+                    {
+                        Text = text,
+                        LeftX = leftX,
+                        RightX = rightX,
+                        BaselineY = baselineY,
+                        TopY = topY
+                    });
                 }
             }
         }
 
         public void FinishProcessing()
         {
-            if (_allTextInfos.Count == 0 || string.IsNullOrWhiteSpace(_keyword)) return;
+            if (_allChunks.Count == 0 || string.IsNullOrWhiteSpace(_keyword)) return;
 
-            // 1. Direct match within single TextRenderInfo
-            foreach (var tri in _allTextInfos)
+            string normKw = PdfSignHelper.NormalizeForMatch(_keyword);
+            string cleanKwWords = PdfSignHelper.ExtractCleanWords(_keyword);
+
+            // 1. Direct match within single TextChunk
+            foreach (var chunk in _allChunks)
             {
-                string text = tri.GetText();
-                if (text.IndexOf(_keyword, StringComparison.OrdinalIgnoreCase) >= 0)
+                string normChunk = PdfSignHelper.NormalizeForMatch(chunk.Text);
+                string cleanChunk = PdfSignHelper.ExtractCleanWords(chunk.Text);
+
+                if ((!string.IsNullOrEmpty(normKw) && normChunk.Contains(normKw)) ||
+                    (!string.IsNullOrEmpty(cleanKwWords) && cleanKwWords.Length >= 4 && cleanChunk.Contains(cleanKwWords)))
                 {
-                    AddPositionFromRenderInfo(tri);
+                    AddPositionFromChunk(chunk);
                 }
             }
 
             if (FoundPositions.Count > 0) return;
 
             // 2. Multi-word match on the same line (grouped by baseline Y within ~5pt tolerance)
-            var lineGroups = _allTextInfos
-                .GroupBy(t => (int)Math.Round(t.GetBaseline().GetStartPoint().Get(1) / 4.0) * 4)
+            var lineGroups = _allChunks
+                .GroupBy(t => (int)Math.Round(t.BaselineY / 5.0) * 5)
                 .OrderByDescending(g => g.Key);
 
             foreach (var group in lineGroups)
             {
-                var sorted = group.OrderBy(t => t.GetBaseline().GetStartPoint().Get(0)).ToList();
-                var fullLineText = string.Join(" ", sorted.Select(t => t.GetText().Trim())).Trim();
+                var sorted = group.OrderBy(t => t.LeftX).ToList();
 
-                int matchIdx = fullLineText.IndexOf(_keyword, StringComparison.OrdinalIgnoreCase);
-                if (matchIdx >= 0)
+                // Find contiguous slice of chunks that exactly matches the keyword
+                bool matchedSlice = false;
+                for (int i = 0; i < sorted.Count; i++)
                 {
-                    // Find the sub-range of tokens matching the keyword
-                    int curPos = 0;
-                    TextRenderInfo? startTri = null;
-                    TextRenderInfo? endTri = null;
-
-                    foreach (var tri in sorted)
+                    for (int j = i; j < sorted.Count; j++)
                     {
-                        string t = tri.GetText().Trim();
-                        if (string.IsNullOrEmpty(t)) continue;
+                        var slice = sorted.Skip(i).Take(j - i + 1).ToList();
+                        var sliceRaw = string.Concat(slice.Select(t => t.Text.Trim() + " ")).Trim();
+                        var sliceNorm = PdfSignHelper.NormalizeForMatch(sliceRaw);
+                        var sliceClean = PdfSignHelper.ExtractCleanWords(sliceRaw);
 
-                        int triStart = curPos;
-                        int triEnd = curPos + t.Length;
-
-                        if (matchIdx >= triStart && matchIdx < triEnd + 2 && startTri == null)
+                        if ((!string.IsNullOrEmpty(normKw) && sliceNorm.Contains(normKw)) ||
+                            (!string.IsNullOrEmpty(cleanKwWords) && cleanKwWords.Length >= 4 && sliceClean.Contains(cleanKwWords)))
                         {
-                            startTri = tri;
+                            TextChunk startChunk = slice.First();
+                            TextChunk endChunk = slice.Last();
+
+                            float leftX = startChunk.LeftX;
+                            float rightX = endChunk.RightX;
+                            if (rightX <= leftX) rightX = leftX + Math.Max(30f, _keyword.Length * 6.5f);
+                            float baselineY = startChunk.BaselineY;
+                            float topY = Math.Max(startChunk.TopY, endChunk.TopY);
+                            if (topY <= baselineY) topY = baselineY + 12f;
+
+                            bool isDuplicate = FoundPositions.Any(p => Math.Abs(p.BaselineY - baselineY) < 8f && Math.Abs(p.LeftX - leftX) < 25f);
+                            if (!isDuplicate)
+                            {
+                                FoundPositions.Add(new KeywordPositionInfo
+                                {
+                                    LeftX = leftX,
+                                    RightX = rightX,
+                                    BaselineY = baselineY,
+                                    TopY = topY
+                                });
+                            }
+                            matchedSlice = true;
+                            break;
                         }
-
-                        if (matchIdx + _keyword.Length >= triStart && matchIdx + _keyword.Length <= triEnd + 3)
-                        {
-                            endTri = tri;
-                        }
-
-                        curPos += t.Length + 1;
                     }
-
-                    startTri ??= sorted.First();
-                    endTri ??= sorted.Last();
-
-                    float leftX = startTri.GetBaseline().GetStartPoint().Get(0);
-                    float rightX = endTri.GetBaseline().GetEndPoint().Get(0);
-                    if (rightX <= leftX) rightX = leftX + Math.Max(30f, _keyword.Length * 6.5f);
-                    float baselineY = startTri.GetBaseline().GetStartPoint().Get(1);
-                    float topY = startTri.GetAscentLine().GetStartPoint().Get(1);
-                    if (topY <= baselineY) topY = baselineY + 12f;
-
-                    bool isDuplicate = FoundPositions.Any(p => Math.Abs(p.BaselineY - baselineY) < 8f && Math.Abs(p.LeftX - leftX) < 25f);
-                    if (!isDuplicate)
-                    {
-                        FoundPositions.Add(new KeywordPositionInfo
-                        {
-                            LeftX = leftX,
-                            RightX = rightX,
-                            BaselineY = baselineY,
-                            TopY = topY
-                        });
-                    }
+                    if (matchedSlice) break;
                 }
             }
         }
 
-        private void AddPositionFromRenderInfo(TextRenderInfo tri)
+        private void AddPositionFromChunk(TextChunk chunk)
         {
-            var start = tri.GetBaseline().GetStartPoint();
-            var end = tri.GetBaseline().GetEndPoint();
-            var ascent = tri.GetAscentLine().GetStartPoint();
-
-            float leftX = start.Get(0);
-            float rightX = end.Get(0);
-            if (rightX <= leftX) rightX = leftX + Math.Max(20f, tri.GetText().Length * 6f);
-            float baselineY = start.Get(1);
-            float topY = ascent.Get(1);
+            float leftX = chunk.LeftX;
+            float rightX = chunk.RightX;
+            if (rightX <= leftX) rightX = leftX + Math.Max(20f, chunk.Text.Length * 6f);
+            float baselineY = chunk.BaselineY;
+            float topY = chunk.TopY;
             if (topY <= baselineY) topY = baselineY + 12f;
 
             bool isDuplicate = FoundPositions.Any(p => Math.Abs(p.BaselineY - baselineY) < 8f && Math.Abs(p.LeftX - leftX) < 25f);

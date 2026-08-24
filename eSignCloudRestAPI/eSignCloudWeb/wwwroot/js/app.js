@@ -953,7 +953,7 @@ class AppController {
   handleAlignmentChange(alignVal, targetOffsetId) {
     const el = document.getElementById(targetOffsetId);
     if (!el) return;
-    if (el.value === '-70,-60' || el.value === '-30,-100' || el.value === '') {
+    if (el.value === '0,-10' || el.value === '-30,-100' || el.value === '') {
       el.value = '0,0';
     }
   }

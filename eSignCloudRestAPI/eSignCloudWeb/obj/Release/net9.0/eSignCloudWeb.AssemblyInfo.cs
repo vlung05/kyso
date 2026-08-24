@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("eSignCloudWeb")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+06cc400a206da054737b5f76f48517f55e7930af")]
 [assembly: System.Reflection.AssemblyProductAttribute("eSignCloudWeb")]
 [assembly: System.Reflection.AssemblyTitleAttribute("eSignCloudWeb")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
