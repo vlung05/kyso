@@ -148,6 +148,13 @@ class AppController {
     document.getElementById('btn-logout').style.display = 'none';
     document.getElementById('btn-settings').style.display = 'none';
     document.getElementById('badge-admin').style.display = 'none';
+
+    if (document.getElementById('login-uid')) {
+      document.getElementById('login-uid').value = this.config?.defaultAgreementUUID || '';
+    }
+    if (document.getElementById('login-passcode')) {
+      document.getElementById('login-passcode').value = this.config?.defaultPassCode || '';
+    }
   }
 
   showDashboard() {
@@ -249,10 +256,14 @@ class AppController {
   }
 
   fillDemoAccount() {
-    if (this.config) {
-      document.getElementById('login-uid').value = '836A41B0-2C34-422F-AB5B-646963E41AC9';
-      document.getElementById('login-passcode').value = '12345678';
-      this.showToast('Đã điền tài khoản Người ký thông thường (Trần Thị B)', 'info');
+    const accs = this.config?.accounts || [];
+    if (accs.length > 0) {
+      const firstAcc = accs[0];
+      document.getElementById('login-uid').value = firstAcc.agreementUUID || '';
+      document.getElementById('login-passcode').value = firstAcc.defaultPasscode || '12345678';
+      this.showToast(`Đã điền tài khoản (${firstAcc.signerName || firstAcc.agreementUUID})`, 'info');
+    } else {
+      this.showToast('Chưa có tài khoản UID nào trong danh bạ.', 'warning');
     }
   }
 
@@ -267,6 +278,7 @@ class AppController {
     this.passcode = '';
     this.signerName = '';
     this.isAdmin = false;
+    localStorage.removeItem('eSign_uid');
     localStorage.removeItem('eSign_signer_name');
     sessionStorage.removeItem('eSign_passcode');
     sessionStorage.removeItem('eSign_is_admin');
@@ -624,7 +636,7 @@ class AppController {
     const accounts = this.config?.accounts || [];
 
     if (accounts.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 24px;">Chưa có tài khoản UID nào. Hãy bấm "Thêm UID Mới".</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 24px;">Chưa có tài khoản UID nào. Hãy bấm "Thêm UID Mới".</td></tr>`;
       return;
     }
 
@@ -638,7 +650,14 @@ class AppController {
           </div>
         </td>
         <td><code style="color: var(--accent); font-size: 0.8rem;">${acc.agreementUUID}</code></td>
-        <td style="font-size: 0.8rem;">${acc.department || '--'} <br><span style="color: var(--text-muted);">${acc.email || ''}</span></td>
+        <td>
+          ${acc.phone ? `<span style="color: #38bdf8; font-family: monospace; font-size: 0.82rem; display: inline-flex; align-items: center; gap: 4px;"><i class="fa-solid fa-phone" style="font-size: 0.72rem; opacity: 0.75;"></i>${acc.phone}</span>` : '<span style="color: var(--text-muted); font-size: 0.8rem;">--</span>'}
+        </td>
+        <td style="text-align: center;">
+          <span class="badge-fmt" style="background: rgba(56, 189, 248, 0.12); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.25); padding: 3px 9px; border-radius: 12px; font-weight: 600; font-size: 0.78rem; display: inline-flex; align-items: center; gap: 4px;">
+            <i class="fa-solid fa-file-circle-check"></i> ${acc.signedCount || 0}
+          </span>
+        </td>
         <td><span style="font-family: monospace; color: #cbd5e1;">••••••••</span></td>
         <td><span class="status-badge success"><i class="fa-solid fa-circle-check"></i> ${acc.status || 'Hoạt động'}</span></td>
         <td>
@@ -708,6 +727,10 @@ class AppController {
       const data = await resp.json();
       if (data.success) {
         this.config.accounts = data.accounts;
+        if (this.uid && this.uid.toLowerCase() === uuid.toLowerCase()) {
+          this.uid = '';
+          localStorage.removeItem('eSign_uid');
+        }
         this.renderUidsTable();
         this.showToast('Đã xóa UID thành công!', 'info');
       }
@@ -1044,26 +1067,28 @@ class AppController {
         const imgValEl = document.getElementById(`slide-img-val-${idx}`);
         const imgUrlInputEl = document.getElementById(`slide-img-url-input-${idx}`);
 
-        let imgUrl = s.imageUrl || '';
-        if (imgValEl && imgValEl.value !== undefined) imgUrl = imgValEl.value.trim();
-        else if (imgUrlInputEl && imgUrlInputEl.value !== undefined) imgUrl = imgUrlInputEl.value.trim();
+        let imgUrl = (s.imageUrl || s.ImageUrl || '').trim();
+        if (imgValEl && imgValEl.value !== undefined && imgValEl.value !== '') imgUrl = imgValEl.value.trim();
+        else if (imgUrlInputEl && imgUrlInputEl.value !== undefined && imgUrlInputEl.value !== '') imgUrl = imgUrlInputEl.value.trim();
 
-        let linkVal = s.linkUrl || s.buttonLink || '';
+        let linkVal = (s.linkUrl || s.LinkUrl || s.buttonLink || s.ButtonLink || '').trim();
         if (linkEl && linkEl.value !== undefined) linkVal = linkEl.value.trim();
 
         const fitEl = document.querySelector(`.slide-edit-fit[data-idx="${idx}"]`);
-        const fitVal = fitEl ? fitEl.value : (s.imageFit || 'contain');
+        const fitVal = fitEl ? fitEl.value : (s.imageFit || s.ImageFit || 'contain');
 
         return {
-          ...s,
-          tag: tagEl ? tagEl.value.trim() : s.tag,
-          title: titleEl ? titleEl.value.trim() : s.title,
-          description: descEl ? descEl.value.trim() : s.description,
-          gradient: gradEl ? gradEl.value.trim() : s.gradient,
+          id: s.id || s.Id || (idx + 1),
+          tag: tagEl ? tagEl.value.trim() : (s.tag || s.Tag || 'BANNER'),
+          title: titleEl ? titleEl.value.trim() : (s.title || s.Title || ''),
+          description: descEl ? descEl.value.trim() : (s.description || s.Description || ''),
+          gradient: gradEl ? gradEl.value.trim() : (s.gradient || s.Gradient || 'linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)'),
           imageUrl: imgUrl,
           imageFit: fitVal,
           linkUrl: linkVal,
-          buttonLink: linkVal
+          buttonLink: linkVal,
+          icon: s.icon || s.Icon || 'shield-check',
+          buttonText: s.buttonText || s.ButtonText || 'Khám phá ngay'
         };
       })
     };

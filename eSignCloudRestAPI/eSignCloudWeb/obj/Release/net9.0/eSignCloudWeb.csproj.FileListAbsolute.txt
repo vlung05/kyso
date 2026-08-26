@@ -141,8 +141,6 @@ E:\project\KySo-Icorp\eSignCloudRestAPI\eSignCloudWeb\obj\Release\net9.0\rjsmraz
 E:\project\KySo-Icorp\eSignCloudRestAPI\eSignCloudWeb\obj\Release\net9.0\rjsmcshtml.dswa.cache.json
 E:\project\KySo-Icorp\eSignCloudRestAPI\eSignCloudWeb\obj\Release\net9.0\scopedcss\bundle\eSignCloudWeb.styles.css
 E:\project\KySo-Icorp\eSignCloudRestAPI\eSignCloudWeb\obj\Release\net9.0\compressed\1ya87jccad-pw63e5paop.gz
-E:\project\KySo-Icorp\eSignCloudRestAPI\eSignCloudWeb\obj\Release\net9.0\compressed\gf27hcz88l-nz5vlterai.gz
-E:\project\KySo-Icorp\eSignCloudRestAPI\eSignCloudWeb\obj\Release\net9.0\compressed\d8rog591px-sl3hrc3zfs.gz
 E:\project\KySo-Icorp\eSignCloudRestAPI\eSignCloudWeb\obj\Release\net9.0\staticwebassets.build.json
 E:\project\KySo-Icorp\eSignCloudRestAPI\eSignCloudWeb\obj\Release\net9.0\staticwebassets.build.json.cache
 E:\project\KySo-Icorp\eSignCloudRestAPI\eSignCloudWeb\obj\Release\net9.0\staticwebassets.development.json
@@ -153,3 +151,5 @@ E:\project\KySo-Icorp\eSignCloudRestAPI\eSignCloudWeb\obj\Release\net9.0\refint\
 E:\project\KySo-Icorp\eSignCloudRestAPI\eSignCloudWeb\obj\Release\net9.0\eSignCloudWeb.pdb
 E:\project\KySo-Icorp\eSignCloudRestAPI\eSignCloudWeb\obj\Release\net9.0\eSignCloudWeb.genruntimeconfig.cache
 E:\project\KySo-Icorp\eSignCloudRestAPI\eSignCloudWeb\obj\Release\net9.0\ref\eSignCloudWeb.dll
+E:\project\KySo-Icorp\eSignCloudRestAPI\eSignCloudWeb\obj\Release\net9.0\compressed\gf27hcz88l-fg1sxegmjj.gz
+E:\project\KySo-Icorp\eSignCloudRestAPI\eSignCloudWeb\obj\Release\net9.0\compressed\d8rog591px-5wvktg9kgo.gz

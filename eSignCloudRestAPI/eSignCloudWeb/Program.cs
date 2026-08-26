@@ -307,21 +307,46 @@ app.MapDelete("/api/documents/{id}", (string id, HistoryService historyService) 
 });
 
 // =================== CONFIGURATION ENDPOINTS ===================
-app.MapGet("/api/config", (ConfigService configService) =>
+app.MapGet("/api/config", (ConfigService configService, HistoryService historyService) =>
 {
     var config = configService.GetConfig();
+    if (config.Accounts != null && config.Accounts.Count > 0)
+    {
+        var counts = historyService.GetAllSignedCounts();
+        foreach (var acc in config.Accounts)
+        {
+            acc.SignedCount = counts.TryGetValue(acc.AgreementUUID, out int c) ? c : 0;
+        }
+    }
     return Results.Ok(config);
 });
 
-app.MapPost("/api/config", (ESignCloudConfig newConfig, ConfigService configService) =>
+app.MapPost("/api/config", (ESignCloudConfig newConfig, ConfigService configService, HistoryService historyService) =>
 {
     configService.SaveConfig(newConfig);
-    return Results.Ok(new { success = true, message = "Đã lưu cấu hình thành công!", config = configService.GetConfig() });
+    var savedConfig = configService.GetConfig();
+    if (savedConfig.Accounts != null && savedConfig.Accounts.Count > 0)
+    {
+        var counts = historyService.GetAllSignedCounts();
+        foreach (var acc in savedConfig.Accounts)
+        {
+            acc.SignedCount = counts.TryGetValue(acc.AgreementUUID, out int c) ? c : 0;
+        }
+    }
+    return Results.Ok(new { success = true, message = "Đã lưu cấu hình thành công!", config = savedConfig });
 });
 
-app.MapPost("/api/config/reset", (ConfigService configService) =>
+app.MapPost("/api/config/reset", (ConfigService configService, HistoryService historyService) =>
 {
     var resetConfig = configService.ResetToDefault();
+    if (resetConfig.Accounts != null && resetConfig.Accounts.Count > 0)
+    {
+        var counts = historyService.GetAllSignedCounts();
+        foreach (var acc in resetConfig.Accounts)
+        {
+            acc.SignedCount = counts.TryGetValue(acc.AgreementUUID, out int c) ? c : 0;
+        }
+    }
     return Results.Ok(new { success = true, message = "Đã khôi phục cấu hình mặc định!", config = resetConfig });
 });
 
@@ -369,13 +394,19 @@ app.MapGet("/api/slides", (ConfigService configService) =>
 });
 
 // =================== ADMIN UID DIRECTORY MANAGEMENT ===================
-app.MapGet("/api/admin/uids", (ConfigService configService) =>
+app.MapGet("/api/admin/uids", (ConfigService configService, HistoryService historyService) =>
 {
     var config = configService.GetConfig();
-    return Results.Ok(config.Accounts ?? new List<SignerAccountRecord>());
+    var accounts = config.Accounts ?? new List<SignerAccountRecord>();
+    var counts = historyService.GetAllSignedCounts();
+    foreach (var acc in accounts)
+    {
+        acc.SignedCount = counts.TryGetValue(acc.AgreementUUID, out int c) ? c : 0;
+    }
+    return Results.Ok(accounts);
 });
 
-app.MapPost("/api/admin/uids", (SignerAccountRecord account, ConfigService configService) =>
+app.MapPost("/api/admin/uids", (SignerAccountRecord account, ConfigService configService, HistoryService historyService) =>
 {
     if (string.IsNullOrWhiteSpace(account.AgreementUUID))
     {
@@ -401,20 +432,50 @@ app.MapPost("/api/admin/uids", (SignerAccountRecord account, ConfigService confi
         config.Accounts.Add(account);
     }
 
+    // Deduplicate
+    config.Accounts = config.Accounts
+        .Where(a => !string.IsNullOrWhiteSpace(a.AgreementUUID))
+        .GroupBy(a => a.AgreementUUID.Trim(), StringComparer.OrdinalIgnoreCase)
+        .Select(g => g.First())
+        .ToList();
+
     configService.SaveConfig(config);
+
+    var counts = historyService.GetAllSignedCounts();
+    foreach (var acc in config.Accounts)
+    {
+        acc.SignedCount = counts.TryGetValue(acc.AgreementUUID, out int c) ? c : 0;
+    }
+
     return Results.Ok(new { success = true, message = "Đã lưu tài khoản UID thành công!", accounts = config.Accounts });
 });
 
-app.MapDelete("/api/admin/uids/{uuid}", (string uuid, ConfigService configService) =>
+app.MapDelete("/api/admin/uids/{uuid}", (string uuid, ConfigService configService, HistoryService historyService) =>
 {
     var config = configService.GetConfig();
     config.Accounts ??= new List<SignerAccountRecord>();
+    string targetUuid = uuid.Trim();
 
-    var item = config.Accounts.FirstOrDefault(a => a.AgreementUUID.Equals(uuid.Trim(), StringComparison.OrdinalIgnoreCase));
-    if (item != null)
+    int removed = config.Accounts.RemoveAll(a => a.AgreementUUID.Equals(targetUuid, StringComparison.OrdinalIgnoreCase));
+    if (config.AdminUids != null)
     {
-        config.Accounts.Remove(item);
+        config.AdminUids.RemoveAll(u => u.Equals(targetUuid, StringComparison.OrdinalIgnoreCase));
+    }
+    if (string.Equals(config.DefaultAgreementUUID, targetUuid, StringComparison.OrdinalIgnoreCase))
+    {
+        config.DefaultAgreementUUID = "";
+    }
+
+    if (removed > 0)
+    {
         configService.SaveConfig(config);
+
+        var counts = historyService.GetAllSignedCounts();
+        foreach (var acc in config.Accounts)
+        {
+            acc.SignedCount = counts.TryGetValue(acc.AgreementUUID, out int c) ? c : 0;
+        }
+
         return Results.Ok(new { success = true, message = "Đã xóa UID khỏi danh bạ.", accounts = config.Accounts });
     }
 

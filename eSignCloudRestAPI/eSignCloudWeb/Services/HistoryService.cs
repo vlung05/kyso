@@ -40,6 +40,26 @@ namespace eSignCloudWeb.Services
             }
         }
 
+        public int GetSignedCountByUid(string agreementUUID)
+        {
+            lock (_lock)
+            {
+                if (string.IsNullOrWhiteSpace(agreementUUID)) return 0;
+                return _records.Count(r => string.Equals(r.AgreementUUID, agreementUUID, StringComparison.OrdinalIgnoreCase));
+            }
+        }
+
+        public Dictionary<string, int> GetAllSignedCounts()
+        {
+            lock (_lock)
+            {
+                return _records
+                    .Where(r => !string.IsNullOrWhiteSpace(r.AgreementUUID))
+                    .GroupBy(r => r.AgreementUUID.Trim(), StringComparer.OrdinalIgnoreCase)
+                    .ToDictionary(g => g.Key, g => g.Count(), StringComparer.OrdinalIgnoreCase);
+            }
+        }
+
         public SignedDocumentRecord? GetDocumentById(string id)
         {
             lock (_lock)

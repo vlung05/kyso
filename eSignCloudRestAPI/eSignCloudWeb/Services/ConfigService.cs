@@ -3,12 +3,19 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using eSignCloudWeb.Models;
+using Microsoft.AspNetCore.Hosting;
 using Newtonsoft.Json;
 
 namespace eSignCloudWeb.Services
 {
     public class ConfigService
     {
+        private static readonly JsonSerializerSettings JsonSettings = new JsonSerializerSettings
+        {
+            ObjectCreationHandling = ObjectCreationHandling.Replace,
+            Formatting = Formatting.Indented
+        };
+
         private readonly string _configFilePath;
         private readonly string _accountsFilePath;
         private readonly object _lock = new object();
@@ -35,33 +42,34 @@ namespace eSignCloudWeb.Services
             {
                 if (newConfig == null) throw new ArgumentNullException(nameof(newConfig));
 
-                // 1. Bảo vệ danh bạ Accounts: Không bao giờ để mất khi lưu cấu hình từ tab khác
-                if (newConfig.Accounts == null || newConfig.Accounts.Count == 0)
+                newConfig.Accounts ??= new List<SignerAccountRecord>();
+                newConfig.AdminUids ??= new List<string>();
+
+                // Deduplicate accounts and adminUids
+                newConfig.Accounts = newConfig.Accounts
+                    .Where(a => !string.IsNullOrWhiteSpace(a.AgreementUUID))
+                    .GroupBy(a => a.AgreementUUID.Trim(), StringComparer.OrdinalIgnoreCase)
+                    .Select(g => g.First())
+                    .ToList();
+
+                newConfig.AdminUids = newConfig.AdminUids
+                    .Where(u => !string.IsNullOrWhiteSpace(u))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+
+                if (newConfig.Slides != null)
                 {
-                    if (_currentConfig?.Accounts != null && _currentConfig.Accounts.Count > 0)
+                    for (int i = 0; i < newConfig.Slides.Count; i++)
                     {
-                        newConfig.Accounts = _currentConfig.Accounts;
-                    }
-                    else
-                    {
-                        var backupAccs = LoadAccountsBackup();
-                        if (backupAccs != null && backupAccs.Count > 0)
-                        {
-                            newConfig.Accounts = backupAccs;
-                        }
+                        newConfig.Slides[i].Id = i + 1;
                     }
                 }
-
-                // 2. Bảo vệ AdminUids
-                if (newConfig.AdminUids == null || newConfig.AdminUids.Count == 0)
+                else if (_currentConfig?.Slides != null)
                 {
-                    if (_currentConfig?.AdminUids != null && _currentConfig.AdminUids.Count > 0)
-                    {
-                        newConfig.AdminUids = _currentConfig.AdminUids;
-                    }
+                    newConfig.Slides = _currentConfig.Slides;
                 }
 
-                // 3. Bảo vệ Admin Username & Password
+                // Protect Admin Username & Password
                 if (string.IsNullOrWhiteSpace(newConfig.AdminUsername) && !string.IsNullOrWhiteSpace(_currentConfig?.AdminUsername))
                 {
                     newConfig.AdminUsername = _currentConfig.AdminUsername;
@@ -71,17 +79,11 @@ namespace eSignCloudWeb.Services
                     newConfig.AdminPassword = _currentConfig.AdminPassword;
                 }
 
-                // 4. Bảo vệ Slides
-                if ((newConfig.Slides == null || newConfig.Slides.Count == 0) && _currentConfig?.Slides != null && _currentConfig.Slides.Count > 0)
-                {
-                    newConfig.Slides = _currentConfig.Slides;
-                }
-
                 _currentConfig = newConfig;
-                string json = JsonConvert.SerializeObject(_currentConfig, Formatting.Indented);
+                string json = JsonConvert.SerializeObject(_currentConfig, JsonSettings);
                 File.WriteAllText(_configFilePath, json);
 
-                // Tự động sao lưu Accounts sang storage/accounts.json
+                // Đồng bộ danh bạ sang storage/accounts.json
                 SaveAccountsBackup(_currentConfig.Accounts);
             }
         }
@@ -90,27 +92,60 @@ namespace eSignCloudWeb.Services
         {
             lock (_lock)
             {
-                var existingAccounts = _currentConfig?.Accounts ?? LoadAccountsBackup();
-                var existingAdminUids = _currentConfig?.AdminUids;
+                var existingAccounts = _currentConfig?.Accounts ?? new List<SignerAccountRecord>();
+                var existingAdminUids = _currentConfig?.AdminUids ?? new List<string>();
 
                 _currentConfig = new ESignCloudConfig();
+                _currentConfig.Accounts = existingAccounts;
+                _currentConfig.AdminUids = existingAdminUids;
+                _currentConfig.Slides = GetDefaultSlides();
 
-                // Giữ lại danh bạ người dùng & quyền admin khi reset cấu hình kết nối
-                if (existingAccounts != null && existingAccounts.Count > 0)
-                {
-                    _currentConfig.Accounts = existingAccounts;
-                }
-                if (existingAdminUids != null && existingAdminUids.Count > 0)
-                {
-                    _currentConfig.AdminUids = existingAdminUids;
-                }
-
-                string json = JsonConvert.SerializeObject(_currentConfig, Formatting.Indented);
+                string json = JsonConvert.SerializeObject(_currentConfig, JsonSettings);
                 File.WriteAllText(_configFilePath, json);
                 SaveAccountsBackup(_currentConfig.Accounts);
 
                 return _currentConfig;
             }
+        }
+
+        public static List<SlideItem> GetDefaultSlides()
+        {
+            return new List<SlideItem>
+            {
+                new SlideItem
+                {
+                    Id = 1,
+                    Tag = "DỊCH VỤ CHỮ KÝ SỐ CLOUD",
+                    Title = "Ký Số Từ Xa Mobile-ID RSSP",
+                    Description = "Ký số mọi lúc, mọi nơi trên đa thiết bị không cần USB Token. Đạt chuẩn bảo mật eIDAS & TT 16/2019/BTTTT.",
+                    Gradient = "linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)",
+                    Icon = "shield-check",
+                    ButtonText = "Khám phá ngay",
+                    ButtonLink = "#"
+                },
+                new SlideItem
+                {
+                    Id = 2,
+                    Tag = "TÍNH NĂNG NỔI BẬT",
+                    Title = "Tương Thích PDF & Microsoft Word",
+                    Description = "Hỗ trợ định dạng tài liệu PDF, DOC, DOCX. Tùy biến vị trí ký linh hoạt, chữ ký đồ họa chuẩn pháp lý.",
+                    Gradient = "linear-gradient(135deg, #0ba360 0%, #3cba92 100%)",
+                    Icon = "file-signature",
+                    ButtonText = "Ký thử tài liệu",
+                    ButtonLink = "#"
+                },
+                new SlideItem
+                {
+                    Id = 3,
+                    Tag = "BẢO MẬT TUYỆT ĐỐI",
+                    Title = "Xác Thực Passcode & OTP 2 Lớp",
+                    Description = "Bảo vệ giao dịch ký an toàn với xác thực PassCode cá nhân hóa và mã OTP tức thời từ Mobile-ID.",
+                    Gradient = "linear-gradient(135deg, #7928ca 0%, #ff0080 100%)",
+                    Icon = "lock",
+                    ButtonText = "Xem tài liệu API",
+                    ButtonLink = "#"
+                }
+            };
         }
 
         public string ResolveKeyStorePath(string contentRootPath)
@@ -161,7 +196,7 @@ namespace eSignCloudWeb.Services
                 try
                 {
                     string json = File.ReadAllText(_configFilePath);
-                    config = JsonConvert.DeserializeObject<ESignCloudConfig>(json);
+                    config = JsonConvert.DeserializeObject<ESignCloudConfig>(json, JsonSettings);
                 }
                 catch (Exception)
                 {
@@ -170,24 +205,54 @@ namespace eSignCloudWeb.Services
             }
 
             config ??= new ESignCloudConfig();
+            config.Accounts ??= new List<SignerAccountRecord>();
+            config.AdminUids ??= new List<string>();
+            config.Slides ??= new List<SlideItem>();
 
-            // Nếu trong config.json chưa có Accounts hoặc bị trống, nạp từ file backup storage/accounts.json
-            if (config.Accounts == null || config.Accounts.Count == 0)
+            // Deduplicate
+            config.Accounts = config.Accounts
+                .Where(a => !string.IsNullOrWhiteSpace(a.AgreementUUID))
+                .GroupBy(a => a.AgreementUUID.Trim(), StringComparer.OrdinalIgnoreCase)
+                .Select(g => g.First())
+                .ToList();
+
+            config.AdminUids = config.AdminUids
+                .Where(u => !string.IsNullOrWhiteSpace(u))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            if (config.Slides.Count > 0)
             {
-                var backup = LoadAccountsBackup();
-                if (backup != null && backup.Count > 0)
+                for (int i = 0; i < config.Slides.Count; i++)
                 {
-                    config.Accounts = backup;
+                    config.Slides[i].Id = i + 1;
                 }
             }
-            else
+
+            // Sync with backup file if accounts file exists
+            if (File.Exists(_accountsFilePath))
             {
-                SaveAccountsBackup(config.Accounts);
+                var backup = LoadAccountsBackup();
+                if (backup != null)
+                {
+                    var cleanBackup = backup
+                        .Where(a => !string.IsNullOrWhiteSpace(a.AgreementUUID))
+                        .GroupBy(a => a.AgreementUUID.Trim(), StringComparer.OrdinalIgnoreCase)
+                        .Select(g => g.First())
+                        .ToList();
+
+                    if (config.Accounts.Count == 0 && cleanBackup.Count > 0)
+                    {
+                        config.Accounts = cleanBackup;
+                    }
+                }
             }
+
+            SaveAccountsBackup(config.Accounts);
 
             try
             {
-                string json = JsonConvert.SerializeObject(config, Formatting.Indented);
+                string json = JsonConvert.SerializeObject(config, JsonSettings);
                 File.WriteAllText(_configFilePath, json);
             }
             catch { }
@@ -202,7 +267,7 @@ namespace eSignCloudWeb.Services
                 if (File.Exists(_accountsFilePath))
                 {
                     string json = File.ReadAllText(_accountsFilePath);
-                    return JsonConvert.DeserializeObject<List<SignerAccountRecord>>(json);
+                    return JsonConvert.DeserializeObject<List<SignerAccountRecord>>(json, JsonSettings);
                 }
             }
             catch { }
@@ -211,7 +276,6 @@ namespace eSignCloudWeb.Services
 
         private void SaveAccountsBackup(List<SignerAccountRecord>? accounts)
         {
-            if (accounts == null || accounts.Count == 0) return;
             try
             {
                 string dir = Path.GetDirectoryName(_accountsFilePath) ?? "";
@@ -219,7 +283,13 @@ namespace eSignCloudWeb.Services
                 {
                     Directory.CreateDirectory(dir);
                 }
-                string json = JsonConvert.SerializeObject(accounts, Formatting.Indented);
+                var list = (accounts ?? new List<SignerAccountRecord>())
+                    .Where(a => !string.IsNullOrWhiteSpace(a.AgreementUUID))
+                    .GroupBy(a => a.AgreementUUID.Trim(), StringComparer.OrdinalIgnoreCase)
+                    .Select(g => g.First())
+                    .ToList();
+
+                string json = JsonConvert.SerializeObject(list, JsonSettings);
                 File.WriteAllText(_accountsFilePath, json);
             }
             catch { }
