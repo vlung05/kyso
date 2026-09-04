@@ -414,6 +414,10 @@ namespace eSignCloudWeb.Models
         public DateTime CreatedDate { get; set; } = DateTime.Now;
         public string? CertificateDN { get; set; }
         public string? CertificateSerialNumber { get; set; }
+        public string? IssuerDN { get; set; }
+        public long ValidFrom { get; set; }
+        public long ValidTo { get; set; }
+        public string? Certificate { get; set; }
         public int SignedCount { get; set; } = 0;
     }
 

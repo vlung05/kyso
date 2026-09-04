@@ -82,8 +82,12 @@ app.MapPost("/api/auth/login", async (LoginRequest req, ESignCloudService eSignS
                 if (!string.IsNullOrWhiteSpace(email)) existingAcc.Email = email;
                 if (!string.IsNullOrWhiteSpace(phone)) existingAcc.Phone = phone;
                 if (!string.IsNullOrWhiteSpace(dept)) existingAcc.Department = dept;
-                existingAcc.CertificateDN = result.response?.certificateDN ?? existingAcc.CertificateDN;
-                existingAcc.CertificateSerialNumber = result.response?.certificateSerialNumber ?? existingAcc.CertificateSerialNumber;
+                if (!string.IsNullOrWhiteSpace(result.response?.certificateDN)) existingAcc.CertificateDN = result.response.certificateDN;
+                if (!string.IsNullOrWhiteSpace(result.response?.certificateSerialNumber)) existingAcc.CertificateSerialNumber = result.response.certificateSerialNumber;
+                if (!string.IsNullOrWhiteSpace(result.response?.issuerDN)) existingAcc.IssuerDN = result.response.issuerDN;
+                if (result.response?.validFrom > 0) existingAcc.ValidFrom = result.response.validFrom;
+                if (result.response?.validTo > 0) existingAcc.ValidTo = result.response.validTo;
+                if (!string.IsNullOrWhiteSpace(result.response?.certificate)) existingAcc.Certificate = result.response.certificate;
                 existingAcc.DefaultPasscode = req.Passcode.Trim();
                 existingAcc.Status = "Hoạt động";
             }
@@ -100,7 +104,11 @@ app.MapPost("/api/auth/login", async (LoginRequest req, ESignCloudService eSignS
                     Status = "Hoạt động",
                     CreatedDate = DateTime.Now,
                     CertificateDN = result.response?.certificateDN,
-                    CertificateSerialNumber = result.response?.certificateSerialNumber
+                    CertificateSerialNumber = result.response?.certificateSerialNumber,
+                    IssuerDN = result.response?.issuerDN,
+                    ValidFrom = result.response?.validFrom ?? 0,
+                    ValidTo = result.response?.validTo ?? 0,
+                    Certificate = result.response?.certificate
                 });
             }
             configService.SaveConfig(config);

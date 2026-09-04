@@ -317,18 +317,36 @@ namespace eSignCloudWeb.Services
                         string certDn = signCloudResp.certificateDN ?? "";
                         string serialNumber = signCloudResp.certificateSerialNumber ?? "";
                         string rawCertBase64 = signCloudResp.certificate ?? "";
+                        string finalIssuerDn = signCloudResp.issuerDN ?? "";
+                        long validFrom = signCloudResp.validFrom;
+                        long validTo = signCloudResp.validTo;
 
-                        // 1. Look up from account directory
-                        var account = config.Accounts?.FirstOrDefault(a => a.AgreementUUID.Equals(agreementUUID, StringComparison.OrdinalIgnoreCase));
-                        if (account != null && !string.IsNullOrWhiteSpace(account.SignerName))
+                        // 1. Parse raw certificate if present in sign response
+                        if (!string.IsNullOrWhiteSpace(rawCertBase64))
                         {
-                            signerName = account.SignerName;
-                            if (string.IsNullOrWhiteSpace(certDn)) certDn = account.CertificateDN ?? "";
-                            if (string.IsNullOrWhiteSpace(serialNumber)) serialNumber = account.CertificateSerialNumber ?? "";
+                            var certInfo = ParseCertificateInfo(rawCertBase64);
+                            if (!string.IsNullOrWhiteSpace(certInfo.issuerDn)) finalIssuerDn = certInfo.issuerDn;
+                            if (string.IsNullOrWhiteSpace(certDn) && !string.IsNullOrWhiteSpace(certInfo.subjectDn)) certDn = certInfo.subjectDn;
+                            if (string.IsNullOrWhiteSpace(serialNumber) && !string.IsNullOrWhiteSpace(certInfo.serialNumber)) serialNumber = certInfo.serialNumber;
+                            if (validFrom <= 0 && certInfo.validFrom.HasValue) validFrom = certInfo.validFrom.Value;
+                            if (validTo <= 0 && certInfo.validTo.HasValue) validTo = certInfo.validTo.Value;
                         }
 
-                        // 2. Fetch live certificate detail if missing
-                        if (string.IsNullOrWhiteSpace(signerName) || string.IsNullOrWhiteSpace(certDn))
+                        // 2. Look up from account directory
+                        var account = config.Accounts?.FirstOrDefault(a => a.AgreementUUID.Equals(agreementUUID, StringComparison.OrdinalIgnoreCase));
+                        if (account != null)
+                        {
+                            if (!string.IsNullOrWhiteSpace(account.SignerName)) signerName = account.SignerName;
+                            if (string.IsNullOrWhiteSpace(certDn)) certDn = account.CertificateDN ?? "";
+                            if (string.IsNullOrWhiteSpace(serialNumber)) serialNumber = account.CertificateSerialNumber ?? "";
+                            if (string.IsNullOrWhiteSpace(finalIssuerDn) && !string.IsNullOrWhiteSpace(account.IssuerDN)) finalIssuerDn = account.IssuerDN;
+                            if (validFrom <= 0 && account.ValidFrom > 0) validFrom = account.ValidFrom;
+                            if (validTo <= 0 && account.ValidTo > 0) validTo = account.ValidTo;
+                            if (string.IsNullOrWhiteSpace(rawCertBase64) && !string.IsNullOrWhiteSpace(account.Certificate)) rawCertBase64 = account.Certificate;
+                        }
+
+                        // 3. Fetch live certificate detail if anything essential is missing
+                        if (string.IsNullOrWhiteSpace(signerName) || string.IsNullOrWhiteSpace(certDn) || validFrom <= 0 || validTo <= 0 || string.IsNullOrWhiteSpace(rawCertBase64))
                         {
                             var certResult = await GetCertificateDetailForSignCloudAsync(agreementUUID, passCode);
                             if (certResult.success && certResult.response != null)
@@ -337,12 +355,27 @@ namespace eSignCloudWeb.Services
                                 if (string.IsNullOrWhiteSpace(certDn)) certDn = certResult.response.certificateDN ?? "";
                                 if (string.IsNullOrWhiteSpace(serialNumber)) serialNumber = certResult.response.certificateSerialNumber ?? "";
                                 if (string.IsNullOrWhiteSpace(rawCertBase64)) rawCertBase64 = certResult.response.certificate ?? "";
+                                if (string.IsNullOrWhiteSpace(finalIssuerDn)) finalIssuerDn = certResult.response.issuerDN ?? "";
+                                if (validFrom <= 0 && certResult.response.validFrom > 0) validFrom = certResult.response.validFrom;
+                                if (validTo <= 0 && certResult.response.validTo > 0) validTo = certResult.response.validTo;
+
+                                if (!string.IsNullOrWhiteSpace(rawCertBase64))
+                                {
+                                    var certInfo = ParseCertificateInfo(rawCertBase64);
+                                    if (string.IsNullOrWhiteSpace(finalIssuerDn) && !string.IsNullOrWhiteSpace(certInfo.issuerDn)) finalIssuerDn = certInfo.issuerDn;
+                                    if (validFrom <= 0 && certInfo.validFrom.HasValue) validFrom = certInfo.validFrom.Value;
+                                    if (validTo <= 0 && certInfo.validTo.HasValue) validTo = certInfo.validTo.Value;
+                                }
                             }
                         }
 
                         if (string.IsNullOrWhiteSpace(signerName))
                         {
                             signerName = ExtractSignerName(signCloudResp, agreementUUID);
+                        }
+                        if (string.IsNullOrWhiteSpace(finalIssuerDn))
+                        {
+                            finalIssuerDn = "C=VN,O=I-CA,CN=I-CA SHA-256";
                         }
 
                         if (mimeType == ESignCloudConstant.MIMETYPE_PDF)
@@ -361,7 +394,10 @@ namespace eSignCloudWeb.Services
                                 serialNumber,
                                 rawCertBase64,
                                 keyStorePath,
-                                config.RelyingPartyKeyStorePassword
+                                config.RelyingPartyKeyStorePassword,
+                                finalIssuerDn,
+                                validFrom > 0 ? validFrom : (long?)null,
+                                validTo > 0 ? validTo : (long?)null
                             );
                         }
 
@@ -371,17 +407,6 @@ namespace eSignCloudWeb.Services
 
                         string signedSavedPath = Path.Combine(signedDir, $"{fileId}_{signedFileName}");
                         await File.WriteAllBytesAsync(signedSavedPath, finalSignedBytes);
-
-                        string finalIssuerDn = signCloudResp.issuerDN ?? "";
-                        if (string.IsNullOrWhiteSpace(finalIssuerDn) && !string.IsNullOrWhiteSpace(rawCertBase64))
-                        {
-                            var certInfo = ParseCertificateInfo(rawCertBase64);
-                            if (!string.IsNullOrWhiteSpace(certInfo.issuerDn)) finalIssuerDn = certInfo.issuerDn;
-                        }
-                        if (string.IsNullOrWhiteSpace(finalIssuerDn))
-                        {
-                            finalIssuerDn = "C=VN,O=I-CA,CN=I-CA SHA-256";
-                        }
 
                         var record = new SignedDocumentRecord
                         {
@@ -395,11 +420,11 @@ namespace eSignCloudWeb.Services
                             BillCode = signCloudResp.billCode,
                             ResponseCode = signCloudResp.responseCode,
                             ResponseMessage = signCloudResp.responseMessage ?? "Ký số thành công",
-                            CertificateDN = signCloudResp.certificateDN ?? certDn,
-                            CertificateSerialNumber = signCloudResp.certificateSerialNumber ?? serialNumber,
+                            CertificateDN = !string.IsNullOrWhiteSpace(signCloudResp.certificateDN) ? signCloudResp.certificateDN : certDn,
+                            CertificateSerialNumber = !string.IsNullOrWhiteSpace(signCloudResp.certificateSerialNumber) ? signCloudResp.certificateSerialNumber : serialNumber,
                             IssuerDN = finalIssuerDn,
-                            ValidFrom = signCloudResp.validFrom > 0 ? signCloudResp.validFrom : Utils.CurrentTimeMillis(),
-                            ValidTo = signCloudResp.validTo > 0 ? signCloudResp.validTo : Utils.CurrentTimeMillis() + (365L * 24 * 3600 * 1000),
+                            ValidFrom = validFrom > 0 ? validFrom : Utils.CurrentTimeMillis(),
+                            ValidTo = validTo > 0 ? validTo : (validFrom > 0 ? validFrom + (365L * 24 * 3600 * 1000 * 3) : Utils.CurrentTimeMillis() + (365L * 24 * 3600 * 1000)),
                             OriginalFilePath = originalSavedPath,
                             SignedFilePath = signedSavedPath,
                             Status = "Thành công",
@@ -429,6 +454,9 @@ namespace eSignCloudWeb.Services
                 string certDn = "";
                 string serialNumber = "";
                 string rawCertBase64 = "";
+                string demoIssuerDn = "";
+                long demoValidFrom = 0;
+                long demoValidTo = 0;
 
                 var account = config.Accounts?.FirstOrDefault(a => a.AgreementUUID.Equals(agreementUUID, StringComparison.OrdinalIgnoreCase));
                 if (account != null)
@@ -436,6 +464,10 @@ namespace eSignCloudWeb.Services
                     signerName = account.SignerName;
                     certDn = account.CertificateDN ?? "";
                     serialNumber = account.CertificateSerialNumber ?? "";
+                    demoIssuerDn = account.IssuerDN ?? "";
+                    demoValidFrom = account.ValidFrom;
+                    demoValidTo = account.ValidTo;
+                    rawCertBase64 = account.Certificate ?? "";
                 }
 
                 // Always try fetching latest certificate detail from ICORP RSSP
@@ -445,28 +477,34 @@ namespace eSignCloudWeb.Services
                     signerName = certResult.signerName ?? signerName;
                     certDn = certResult.response.certificateDN ?? certDn;
                     serialNumber = certResult.response.certificateSerialNumber ?? serialNumber;
-                    rawCertBase64 = certResult.response.certificate ?? "";
+                    rawCertBase64 = certResult.response.certificate ?? rawCertBase64;
+                    demoIssuerDn = certResult.response.issuerDN ?? demoIssuerDn;
+                    if (certResult.response.validFrom > 0) demoValidFrom = certResult.response.validFrom;
+                    if (certResult.response.validTo > 0) demoValidTo = certResult.response.validTo;
                 }
 
-                if (string.IsNullOrWhiteSpace(signerName))
-                {
-                    signerName = agreementUUID;
-                }
-
-                string demoIssuerDn = "C=VN,O=I-CA,CN=I-CA SHA-256";
                 if (!string.IsNullOrWhiteSpace(rawCertBase64))
                 {
                     var certInfo = ParseCertificateInfo(rawCertBase64);
                     if (!string.IsNullOrWhiteSpace(certInfo.issuerDn)) demoIssuerDn = certInfo.issuerDn;
                     if (!string.IsNullOrWhiteSpace(certInfo.subjectDn) && string.IsNullOrWhiteSpace(certDn)) certDn = certInfo.subjectDn;
                     if (!string.IsNullOrWhiteSpace(certInfo.serialNumber) && string.IsNullOrWhiteSpace(serialNumber)) serialNumber = certInfo.serialNumber;
+                    if (certInfo.validFrom.HasValue && demoValidFrom <= 0) demoValidFrom = certInfo.validFrom.Value;
+                    if (certInfo.validTo.HasValue && demoValidTo <= 0) demoValidTo = certInfo.validTo.Value;
                 }
 
+                if (string.IsNullOrWhiteSpace(signerName))
+                {
+                    signerName = agreementUUID;
+                }
+                if (string.IsNullOrWhiteSpace(demoIssuerDn))
+                {
+                    demoIssuerDn = "C=VN,O=I-CA,CN=I-CA SHA-256";
+                }
                 if (string.IsNullOrWhiteSpace(certDn))
                 {
                     certDn = $"CN={signerName}, O=I-CA, C=VN";
                 }
-
                 if (string.IsNullOrWhiteSpace(serialNumber))
                 {
                     serialNumber = "54011245529BA74FDD3D8738366A6784";
@@ -491,7 +529,10 @@ namespace eSignCloudWeb.Services
                         serialNumber,
                         rawCertBase64,
                         keyStorePath,
-                        config.RelyingPartyKeyStorePassword
+                        config.RelyingPartyKeyStorePassword,
+                        demoIssuerDn,
+                        demoValidFrom > 0 ? demoValidFrom : (long?)null,
+                        demoValidTo > 0 ? demoValidTo : (long?)null
                     );
                 }
 
@@ -517,8 +558,8 @@ namespace eSignCloudWeb.Services
                     CertificateDN = certDn,
                     CertificateSerialNumber = serialNumber,
                     IssuerDN = demoIssuerDn,
-                    ValidFrom = Utils.CurrentTimeMillis(),
-                    ValidTo = Utils.CurrentTimeMillis() + (365L * 24 * 3600 * 1000),
+                    ValidFrom = demoValidFrom > 0 ? demoValidFrom : Utils.CurrentTimeMillis(),
+                    ValidTo = demoValidTo > 0 ? demoValidTo : (demoValidFrom > 0 ? demoValidFrom + (365L * 24 * 3600 * 1000 * 3) : Utils.CurrentTimeMillis() + (365L * 24 * 3600 * 1000)),
                     OriginalFilePath = originalSavedPath,
                     SignedFilePath = signedSavedPath,
                     Status = "Thành công",
@@ -741,8 +782,8 @@ namespace eSignCloudWeb.Services
                     string? subject = cert.SubjectDN?.ToString();
                     string? issuer = cert.IssuerDN?.ToString();
                     string? serial = cert.SerialNumber?.ToString(16);
-                    long vFrom = new DateTimeOffset(cert.NotBefore).ToUnixTimeMilliseconds();
-                    long vTo = new DateTimeOffset(cert.NotAfter).ToUnixTimeMilliseconds();
+                    long vFrom = new DateTimeOffset(DateTime.SpecifyKind(cert.NotBefore, DateTimeKind.Utc)).ToUnixTimeMilliseconds();
+                    long vTo = new DateTimeOffset(DateTime.SpecifyKind(cert.NotAfter, DateTimeKind.Utc)).ToUnixTimeMilliseconds();
                     return (subject, issuer, serial, vFrom, vTo);
                 }
             }
@@ -757,8 +798,8 @@ namespace eSignCloudWeb.Services
                 string subject = x509.Subject;
                 string issuer = x509.Issuer;
                 string serial = x509.SerialNumber;
-                long vFrom = new DateTimeOffset(x509.NotBefore).ToUnixTimeMilliseconds();
-                long vTo = new DateTimeOffset(x509.NotAfter).ToUnixTimeMilliseconds();
+                long vFrom = new DateTimeOffset(x509.NotBefore.ToUniversalTime()).ToUnixTimeMilliseconds();
+                long vTo = new DateTimeOffset(x509.NotAfter.ToUniversalTime()).ToUnixTimeMilliseconds();
                 return (subject, issuer, serial, vFrom, vTo);
             }
             catch (Exception ex)

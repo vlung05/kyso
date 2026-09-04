@@ -87,7 +87,21 @@
       "Status": "Hoạt động",
       "CreatedDate": "2026-08-21T15:48:22.6050444+07:00",
       "CertificateDN": "C=VN,ST=Hải Phòng,O=HỘ KINH DOANH PHẠM VĂN DŨNG 1979,CN=HỘ KINH DOANH PHẠM VĂN DŨNG 1979,UID=MST:038079004321",
-      "CertificateSerialNumber": "54011257B82BCACF3C55CD198BF23879"
+      "CertificateSerialNumber": "54011257B82BCACF3C55CD198BF23879",
+      "SignedCount": 15
+    },
+    {
+      "AgreementUUID": "6bd05824-f1e9-45e6-9eb5-c03ea14f6ed6",
+      "SignerName": "HỘ KINH DOANH ĐẶNG NGỌC HOÀNG ANH",
+      "Department": "",
+      "Email": "kinhdoanhpmbk@gmail.com",
+      "Phone": "0876718255",
+      "DefaultPasscode": "43936114",
+      "Status": "Hoạt động",
+      "CreatedDate": "2026-08-26T14:20:41.6590942+07:00",
+      "CertificateDN": "C=VN,ST=Hải Phòng,O=HỘ KINH DOANH ĐẶNG NGỌC HOÀNG ANH,CN=HỘ KINH DOANH ĐẶNG NGỌC HOÀNG ANH,UID=MST:031208018909",
+      "CertificateSerialNumber": "540112708F9982FF5F688D279DCD77E5",
+      "SignedCount": 0
     }
   ]
 }

@@ -539,6 +539,13 @@ class AppController {
           <div style="font-size: 0.75rem; color: var(--text-muted);">Đơn vị phát hành (Issuer DN):</div>
           <div style="font-size: 0.85rem;">${doc.issuerDN || 'C=VN,O=I-CA,CN=I-CA SHA-256'}</div>
         </div>
+        <div style="margin-bottom: 12px;">
+          <div style="font-size: 0.75rem; color: var(--text-muted);">Thời hạn hiệu lực chứng thư:</div>
+          <div style="font-size: 0.85rem; display: flex; flex-direction: column; gap: 4px; margin-top: 4px;">
+            <div style="color: #38bdf8;"><i class="fa-regular fa-calendar-check" style="margin-right: 6px;"></i><strong>Hiệu lực từ:</strong> ${doc.validFrom ? new Date(doc.validFrom).toLocaleString('vi-VN') : 'N/A'}</div>
+            <div style="color: #fbbf24;"><i class="fa-regular fa-calendar-xmark" style="margin-right: 6px;"></i><strong>Hiệu lực đến:</strong> ${doc.validTo ? new Date(doc.validTo).toLocaleString('vi-VN') : 'N/A'}</div>
+          </div>
+        </div>
         <div>
           <div style="font-size: 0.75rem; color: var(--text-muted);">Thời gian ký:</div>
           <div>${new Date(doc.signDate).toLocaleString('vi-VN')}</div>
@@ -756,6 +763,13 @@ class AppController {
             <div style="margin-bottom: 10px;"><span style="color: var(--text-muted);">Tên chủ chứng thư:</span> <strong>${data.signerName || 'N/A'}</strong></div>
             <div style="margin-bottom: 10px;"><span style="color: var(--text-muted);">Certificate DN:</span> <div style="font-size: 0.85rem;">${data.certificateDN || 'N/A'}</div></div>
             <div style="margin-bottom: 10px;"><span style="color: var(--text-muted);">Serial Number:</span> <code style="color: var(--accent);">${data.serialNumber || 'N/A'}</code></div>
+            <div style="margin-bottom: 10px;">
+              <span style="color: var(--text-muted);">Thời hạn hiệu lực:</span>
+              <div style="font-size: 0.85rem; display: flex; flex-direction: column; gap: 3px; margin-top: 4px;">
+                <div style="color: #38bdf8;"><i class="fa-regular fa-calendar-check" style="margin-right: 6px;"></i><strong>Hiệu lực từ:</strong> ${data.validFrom ? new Date(data.validFrom).toLocaleString('vi-VN') : 'N/A'}</div>
+                <div style="color: #fbbf24;"><i class="fa-regular fa-calendar-xmark" style="margin-right: 6px;"></i><strong>Hiệu lực đến:</strong> ${data.validTo ? new Date(data.validTo).toLocaleString('vi-VN') : 'N/A'}</div>
+              </div>
+            </div>
             <div><span class="status-badge success"><i class="fa-solid fa-check"></i> Chứng thư hợp lệ trên RSSP Cloud</span></div>
           </div>
         `;

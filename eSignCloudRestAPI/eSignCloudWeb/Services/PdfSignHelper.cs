@@ -47,7 +47,10 @@ namespace eSignCloudWeb.Services
             string? serialNumber = null,
             string? rawCertBase64 = null,
             string? keyStorePath = null,
-            string keyStorePassword = "12345678")
+            string keyStorePassword = "12345678",
+            string? issuerDn = null,
+            long? validFrom = null,
+            long? validTo = null)
         {
             try
             {
@@ -88,7 +91,10 @@ namespace eSignCloudWeb.Services
                         pos.signRect,
                         sigFieldName,
                         keyStorePath,
-                        keyStorePassword);
+                        keyStorePassword,
+                        issuerDn,
+                        validFrom,
+                        validTo);
 
                     if (cryptSigned != null && cryptSigned.Length > 0)
                     {
@@ -100,9 +106,8 @@ namespace eSignCloudWeb.Services
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[PdfSignHelper Error] {ex.Message}");
-                var positions = CalculateAllSignatureBounds(sourcePdfBytes, reason, location, positionIdentifier, pageNoStr, offsetStr, sizeStr, alignment);
-                return StampFallbackVisual(sourcePdfBytes, positions, signerName, reason, location);
+                Console.WriteLine($"[StampDigitalSignature Error] {ex.Message}");
+                return sourcePdfBytes;
             }
         }
 
@@ -769,7 +774,10 @@ namespace eSignCloudWeb.Services
             Rectangle signRect,
             string? sigFieldName,
             string? keyStorePath,
-            string keyStorePassword)
+            string keyStorePassword,
+            string? issuerDn = null,
+            long? validFrom = null,
+            long? validTo = null)
         {
             try
             {
@@ -833,7 +841,7 @@ namespace eSignCloudWeb.Services
                 var chainEntries = pkcs12Store.GetCertificateChain(alias);
 
                 // Build X.509 Certificate matching the real UUID's CertificateDN and SerialNumber
-                Org.BouncyCastle.X509.X509Certificate? userCert = null;
+                Org.BouncyCastle.X509.X509Certificate? authenticCert = null;
 
                 // 1. Try reading the authentic X.509 certificate bytes returned by ICORP
                 if (!string.IsNullOrWhiteSpace(rawCertBase64))
@@ -841,7 +849,7 @@ namespace eSignCloudWeb.Services
                     try
                     {
                         var parser = new X509CertificateParser();
-                        userCert = parser.ReadCertificate(Convert.FromBase64String(rawCertBase64));
+                        authenticCert = parser.ReadCertificate(Convert.FromBase64String(rawCertBase64));
                     }
                     catch (Exception ex)
                     {
@@ -849,8 +857,51 @@ namespace eSignCloudWeb.Services
                     }
                 }
 
-                // 2. Fallback: generate custom X.509 certificate with matching Subject DN & Serial
-                if (userCert == null && !string.IsNullOrWhiteSpace(certDn))
+                // Determine exact NotBefore and NotAfter
+                DateTime notBeforeDate;
+                DateTime notAfterDate;
+
+                if (authenticCert != null)
+                {
+                    notBeforeDate = authenticCert.NotBefore;
+                    notAfterDate = authenticCert.NotAfter;
+                    if (string.IsNullOrWhiteSpace(issuerDn) && authenticCert.IssuerDN != null)
+                    {
+                        issuerDn = authenticCert.IssuerDN.ToString();
+                    }
+                    if (string.IsNullOrWhiteSpace(serialNumber) && authenticCert.SerialNumber != null)
+                    {
+                        serialNumber = authenticCert.SerialNumber.ToString(16);
+                    }
+                    if (string.IsNullOrWhiteSpace(certDn) && authenticCert.SubjectDN != null)
+                    {
+                        certDn = authenticCert.SubjectDN.ToString();
+                    }
+                }
+                else
+                {
+                    if (validFrom.HasValue && validFrom.Value > 0)
+                    {
+                        notBeforeDate = DateTimeOffset.FromUnixTimeMilliseconds(validFrom.Value).UtcDateTime;
+                    }
+                    else
+                    {
+                        notBeforeDate = DateTime.UtcNow.AddDays(-30);
+                    }
+
+                    if (validTo.HasValue && validTo.Value > 0)
+                    {
+                        notAfterDate = DateTimeOffset.FromUnixTimeMilliseconds(validTo.Value).UtcDateTime;
+                    }
+                    else
+                    {
+                        notAfterDate = notBeforeDate.AddYears(1);
+                    }
+                }
+
+                // 2. Generate custom X.509 certificate with exact Subject DN, Serial, Issuer, NotBefore, NotAfter
+                Org.BouncyCastle.X509.X509Certificate? userCert = null;
+                if (!string.IsNullOrWhiteSpace(certDn))
                 {
                     try
                     {
@@ -873,9 +924,21 @@ namespace eSignCloudWeb.Services
                         }
 
                         certGen.SetSerialNumber(serial);
-                        certGen.SetIssuerDN(new X509Name("C=VN,O=I-CA,CN=I-CA SHA-256"));
-                        certGen.SetNotBefore(DateTime.UtcNow.AddDays(-60));
-                        certGen.SetNotAfter(DateTime.UtcNow.AddYears(2));
+
+                        // Set authentic Issuer DN
+                        string effectiveIssuer = !string.IsNullOrWhiteSpace(issuerDn) ? issuerDn : "C=VN,O=I-CA,CN=I-CA SHA-256";
+                        try
+                        {
+                            certGen.SetIssuerDN(new X509Name(effectiveIssuer));
+                        }
+                        catch
+                        {
+                            certGen.SetIssuerDN(new X509Name("C=VN,O=I-CA,CN=I-CA SHA-256"));
+                        }
+
+                        // Set exact Validity matching user certificate
+                        certGen.SetNotBefore(notBeforeDate);
+                        certGen.SetNotAfter(notAfterDate);
 
                         X509Name subjectName;
                         try
