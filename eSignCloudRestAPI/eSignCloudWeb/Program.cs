@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 using eSignCloudWeb.Models;
 using eSignCloudWeb.Services;
@@ -8,9 +9,11 @@ using Microsoft.AspNetCore.Mvc;
 var builder = WebApplication.CreateBuilder(args);
 
 // Configure services
+builder.Services.AddHttpClient();
 builder.Services.AddSingleton<ConfigService>();
 builder.Services.AddSingleton<HistoryService>();
 builder.Services.AddSingleton<ESignCloudService>();
+builder.Services.AddSingleton<GoogleSheetSyncService>();
 
 // Enable CORS
 builder.Services.AddCors(options =>
@@ -75,10 +78,14 @@ app.MapPost("/api/auth/login", async (LoginRequest req, ESignCloudService eSignS
             string email = result.response?.email ?? result.response?.agreementDetails?.email ?? "";
             string phone = result.response?.mobileNo ?? result.response?.agreementDetails?.telephoneNumber ?? "";
             string dept = result.response?.agreementDetails?.organizationUnit ?? result.response?.agreementDetails?.organization ?? "";
+            string taxId = ESignCloudService.ExtractTaxId(result.response, result.response?.certificateDN);
+            string address = ESignCloudService.ExtractAddress(result.response, result.response?.certificateDN);
 
             if (existingAcc != null)
             {
                 if (!string.IsNullOrWhiteSpace(result.signerName)) existingAcc.SignerName = result.signerName;
+                if (!string.IsNullOrWhiteSpace(taxId)) existingAcc.TaxId = taxId;
+                if (!string.IsNullOrWhiteSpace(address)) existingAcc.Address = address;
                 if (!string.IsNullOrWhiteSpace(email)) existingAcc.Email = email;
                 if (!string.IsNullOrWhiteSpace(phone)) existingAcc.Phone = phone;
                 if (!string.IsNullOrWhiteSpace(dept)) existingAcc.Department = dept;
@@ -98,6 +105,8 @@ app.MapPost("/api/auth/login", async (LoginRequest req, ESignCloudService eSignS
                     AgreementUUID = req.Uid.Trim(),
                     SignerName = string.IsNullOrWhiteSpace(result.signerName) ? req.Uid.Trim() : result.signerName,
                     Department = dept,
+                    TaxId = taxId,
+                    Address = address,
                     Email = email,
                     Phone = phone,
                     DefaultPasscode = req.Passcode.Trim(),
@@ -407,10 +416,28 @@ app.MapGet("/api/admin/uids", (ConfigService configService, HistoryService histo
     var config = configService.GetConfig();
     var accounts = config.Accounts ?? new List<SignerAccountRecord>();
     var counts = historyService.GetAllSignedCounts();
+    bool needSave = false;
+
     foreach (var acc in accounts)
     {
         acc.SignedCount = counts.TryGetValue(acc.AgreementUUID, out int c) ? c : 0;
+        if (string.IsNullOrWhiteSpace(acc.TaxId) && !string.IsNullOrWhiteSpace(acc.CertificateDN))
+        {
+            acc.TaxId = ESignCloudService.ExtractTaxIdFromDN(acc.CertificateDN);
+            needSave = true;
+        }
+        if (string.IsNullOrWhiteSpace(acc.Address) && !string.IsNullOrWhiteSpace(acc.CertificateDN))
+        {
+            acc.Address = ESignCloudService.ExtractAddressFromDN(acc.CertificateDN);
+            needSave = true;
+        }
     }
+
+    if (needSave)
+    {
+        configService.SaveConfig(config);
+    }
+
     return Results.Ok(accounts);
 });
 
@@ -429,6 +456,8 @@ app.MapPost("/api/admin/uids", (SignerAccountRecord account, ConfigService confi
     {
         existing.SignerName = account.SignerName;
         existing.Department = account.Department;
+        existing.TaxId = !string.IsNullOrWhiteSpace(account.TaxId) ? account.TaxId : (existing.TaxId ?? "");
+        existing.Address = !string.IsNullOrWhiteSpace(account.Address) ? account.Address : (existing.Address ?? "");
         existing.Email = account.Email;
         existing.Phone = account.Phone;
         existing.DefaultPasscode = account.DefaultPasscode;
@@ -437,6 +466,14 @@ app.MapPost("/api/admin/uids", (SignerAccountRecord account, ConfigService confi
     else
     {
         account.AgreementUUID = account.AgreementUUID.Trim();
+        if (string.IsNullOrWhiteSpace(account.TaxId) && !string.IsNullOrWhiteSpace(account.CertificateDN))
+        {
+            account.TaxId = ESignCloudService.ExtractTaxIdFromDN(account.CertificateDN);
+        }
+        if (string.IsNullOrWhiteSpace(account.Address) && !string.IsNullOrWhiteSpace(account.CertificateDN))
+        {
+            account.Address = ESignCloudService.ExtractAddressFromDN(account.CertificateDN);
+        }
         config.Accounts.Add(account);
     }
 
@@ -490,7 +527,7 @@ app.MapDelete("/api/admin/uids/{uuid}", (string uuid, ConfigService configServic
     return Results.NotFound(new { success = false, message = "Không tìm thấy UID trong danh bạ." });
 });
 
-app.MapPost("/api/admin/uids/verify", async (LoginRequest req, ESignCloudService eSignService) =>
+app.MapPost("/api/admin/uids/verify", async (LoginRequest req, ESignCloudService eSignService, ConfigService configService) =>
 {
     if (string.IsNullOrWhiteSpace(req.Uid))
     {
@@ -498,16 +535,70 @@ app.MapPost("/api/admin/uids/verify", async (LoginRequest req, ESignCloudService
     }
 
     var result = await eSignService.GetCertificateDetailForSignCloudAsync(req.Uid.Trim(), req.Passcode ?? "12345678");
+    string taxId = ESignCloudService.ExtractTaxId(result.response, result.response?.certificateDN);
+    string address = ESignCloudService.ExtractAddress(result.response, result.response?.certificateDN);
+
+    if (result.success)
+    {
+        var config = configService.GetConfig();
+        var existingAcc = config.Accounts?.FirstOrDefault(a => a.AgreementUUID.Equals(req.Uid.Trim(), StringComparison.OrdinalIgnoreCase));
+        if (existingAcc != null)
+        {
+            if (!string.IsNullOrWhiteSpace(result.signerName)) existingAcc.SignerName = result.signerName;
+            if (!string.IsNullOrWhiteSpace(taxId)) existingAcc.TaxId = taxId;
+            if (!string.IsNullOrWhiteSpace(address)) existingAcc.Address = address;
+            if (!string.IsNullOrWhiteSpace(result.response?.certificateDN)) existingAcc.CertificateDN = result.response.certificateDN;
+            if (!string.IsNullOrWhiteSpace(result.response?.certificateSerialNumber)) existingAcc.CertificateSerialNumber = result.response.certificateSerialNumber;
+            if (!string.IsNullOrWhiteSpace(result.response?.issuerDN)) existingAcc.IssuerDN = result.response.issuerDN;
+            if (result.response?.validFrom > 0) existingAcc.ValidFrom = result.response.validFrom;
+            if (result.response?.validTo > 0) existingAcc.ValidTo = result.response.validTo;
+            configService.SaveConfig(config);
+        }
+    }
+
     return Results.Ok(new
     {
         success = result.success,
         message = result.message,
         signerName = result.signerName,
+        taxId = taxId,
+        address = address,
         certificateDN = result.response?.certificateDN,
         serialNumber = result.response?.certificateSerialNumber,
+        issuerDN = result.response?.issuerDN,
         validFrom = result.response?.validFrom,
         validTo = result.response?.validTo
     });
+});
+
+// =================== GOOGLE SHEET SYNC ENDPOINTS ===================
+app.MapPost("/api/admin/googlesheet/sync", async (GoogleSheetSyncRequest req, GoogleSheetSyncService syncService) =>
+{
+    if (string.IsNullOrWhiteSpace(req.SheetUrl))
+    {
+        return Results.BadRequest(new { success = false, message = "Vui lòng nhập đường dẫn Google Sheet!" });
+    }
+
+    var result = await syncService.SyncFromGoogleSheetAsync(req);
+    return Results.Ok(result);
+});
+
+app.MapPost("/api/admin/googlesheet/push", async (PushWebhookRequest req, GoogleSheetSyncService syncService) =>
+{
+    if (string.IsNullOrWhiteSpace(req.WebhookUrl))
+    {
+        return Results.BadRequest(new { success = false, message = "Vui lòng nhập Webhook URL của Google Apps Script!" });
+    }
+
+    var result = await syncService.PushUpdatesToWebhookAsync(req.WebhookUrl, req.Gid ?? "0", req.Updates ?? new List<object>());
+    return Results.Ok(new { success = result.success, message = result.message });
+});
+
+app.MapPost("/api/admin/googlesheet/export-csv", (List<GoogleSheetRowResult> rows, GoogleSheetSyncService syncService) =>
+{
+    string csv = syncService.GenerateUpdatedCsv(rows ?? new List<GoogleSheetRowResult>());
+    byte[] bytes = Encoding.UTF8.GetPreamble().Concat(Encoding.UTF8.GetBytes(csv)).ToArray();
+    return Results.File(bytes, "text/csv; charset=utf-8", "DanhSach_GoogleSheet_DaCapNhat.csv");
 });
 
 app.MapPost("/api/admin/slides/upload-image", async (HttpRequest request, IWebHostEnvironment env) =>
@@ -625,6 +716,45 @@ app.MapGet("/api/debug/inspect-sample", (string? file) =>
     }
 
     return Results.Ok(new { sigs, pages });
+});
+
+app.MapPost("/api/proxy/crm-company-info", async (HttpContext context, IHttpClientFactory httpClientFactory) =>
+{
+    var form = await context.Request.ReadFormAsync();
+    string vMST = form["vMST"];
+    string crmCookie = form["crmCookie"];
+    if (string.IsNullOrWhiteSpace(vMST)) return Results.BadRequest("Missing vMST");
+
+    var client = httpClientFactory.CreateClient();
+    var request = new HttpRequestMessage(HttpMethod.Post, "https://crm.i-ca.vn/RAFrontEnd/JSONCommon");
+    
+    request.Headers.Add("Accept", "*/*");
+    request.Headers.Add("Accept-Language", "en-US,en;q=0.9,vi;q=0.8");
+    request.Headers.Add("Connection", "keep-alive");
+    request.Headers.Add("Origin", "https://crm.i-ca.vn");
+    request.Headers.Add("Referer", "https://crm.i-ca.vn/RAFrontEnd/Certificate/RegisterCertificate.jsp");
+    request.Headers.Add("Sec-Fetch-Dest", "empty");
+    request.Headers.Add("Sec-Fetch-Mode", "cors");
+    request.Headers.Add("Sec-Fetch-Site", "same-origin");
+    request.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36");
+    request.Headers.Add("X-Requested-With", "XMLHttpRequest");
+    
+    if (!string.IsNullOrWhiteSpace(crmCookie))
+    {
+        request.Headers.Add("Cookie", crmCookie);
+    }
+    else
+    {
+        request.Headers.Add("Cookie", "JSESSIONID=j3kmo4_rGZW7ykPr5tsOumZLUFITwcl3mH6ROQkJ.tmsra; XSRF-TOKEN=NDKDdfdsfkldsfNd3SZAJfwLsTl5WUgOkE");
+    }
+
+    var content = new StringContent($"idParam=getcompanyinfoicamst&vMST={vMST}", System.Text.Encoding.UTF8, "application/x-www-form-urlencoded");
+    request.Content = content;
+
+    var response = await client.SendAsync(request);
+    var resultString = await response.Content.ReadAsStringAsync();
+    
+    return Results.Content(resultString, "application/json");
 });
 
 Console.WriteLine("==================================================");

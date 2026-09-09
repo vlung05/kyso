@@ -215,7 +215,8 @@
                   <input type="text" id="meta-pageno" class="form-input" value="-1"
                     placeholder="-1 (Trang cuối), ALL (Tất cả trang), 1,2,3 hoặc 1-5">
                   <div class="field-hint">
-                    <i class="fa-solid fa-layer-group"></i> <b>-1:</b> Trang cuối • <b>ALL:</b> Mọi trang có từ khóa • <b>1,2,5:</b> Các trang cụ thể • <b>1-4:</b> Dải trang
+                    <i class="fa-solid fa-layer-group"></i> <b>-1:</b> Trang cuối • <b>ALL:</b> Mọi trang có từ khóa •
+                    <b>1,2,5:</b> Các trang cụ thể • <b>1-4:</b> Dải trang
                   </div>
                 </div>
                 <div class="form-group" style="margin-bottom: 10px;">
@@ -225,9 +226,11 @@
                 </div>
                 <div class="form-group" style="margin-bottom: 10px;">
                   <label class="form-label" style="font-size: 0.75rem;">
-                    <span><i class="fa-solid fa-align-center" style="color: var(--accent);"></i> Căn lề vị trí ký (ALIGNMENT):</span>
+                    <span><i class="fa-solid fa-align-center" style="color: var(--accent);"></i> Căn lề vị trí ký
+                      (ALIGNMENT):</span>
                   </label>
-                  <select id="meta-alignment" class="form-input" onchange="app.handleAlignmentChange(this.value, 'meta-offset')">
+                  <select id="meta-alignment" class="form-input"
+                    onchange="app.handleAlignmentChange(this.value, 'meta-offset')">
                     <option value="center-below" selected>🎯 Căn giữa dưới từ khóa (Chuẩn văn bản)</option>
                     <option value="left-below">⬅️ Căn lề trái dưới từ khóa</option>
                     <option value="right-below">➡️ Căn lề phải dưới từ khóa</option>
@@ -247,10 +250,10 @@
                     style="font-size: 0.75rem; display: flex; align-items: center; justify-content: space-between;">
                     <span>Độ lệch tinh chỉnh (RECTANGLEOFFSET: X,Y):</span>
                   </label>
-                  <input type="text" id="meta-offset" class="form-input" value="0,0"
-                    placeholder="X,Y (mặc định: 0,0)">
+                  <input type="text" id="meta-offset" class="form-input" value="0,0" placeholder="X,Y (mặc định: 0,0)">
                   <div class="field-hint">
-                    <i class="fa-solid fa-crosshairs"></i> Tinh chỉnh thêm (<b>X:</b> Trái - / Phải +, <b>Y:</b> Dưới - / Trên +)
+                    <i class="fa-solid fa-crosshairs"></i> Tinh chỉnh thêm (<b>X:</b> Trái - / Phải +, <b>Y:</b> Dưới -
+                    / Trên +)
                   </div>
                 </div>
                 <div class="form-group" style="margin-bottom: 10px;">
@@ -357,7 +360,7 @@
          VIEW 3: SETTINGS PAGE (Cấu hình Program.cs & DemoFunction.cs)
          =================================================================== -->
     <section id="view-settings" class="view-section">
-      <div class="glass-card" style="max-width: 1000px; margin: 0 auto;">
+      <div class="glass-card" style="max-width: 1200px; margin: 0 auto;">
         <div class="box-header">
           <div class="box-title">
             <div class="box-title-icon"><i class="fa-solid fa-sliders"></i></div>
@@ -483,8 +486,10 @@
           <div class="form-grid-2">
             <div class="form-group">
               <label class="form-label">Số trang ký (PAGENO):</label>
-              <input type="text" id="cfg-meta-pageno" class="form-input" placeholder="-1 (Trang cuối), ALL (Tất cả trang), 1,2,3 hoặc 1-5">
-              <div class="field-hint">-1: Trang cuối • ALL: Mọi trang có từ khóa • 1,2,5: Chọn trang • 1-4: Dải trang</div>
+              <input type="text" id="cfg-meta-pageno" class="form-input"
+                placeholder="-1 (Trang cuối), ALL (Tất cả trang), 1,2,3 hoặc 1-5">
+              <div class="field-hint">-1: Trang cuối • ALL: Mọi trang có từ khóa • 1,2,5: Chọn trang • 1-4: Dải trang
+              </div>
             </div>
             <div class="form-group">
               <label class="form-label">Từ khóa vị trí ký (POSITIONIDENTIFIER):</label>
@@ -599,9 +604,18 @@
               <p style="color: var(--text-secondary); font-size: 0.85rem;">Quản lý danh sách các `agreementUUID`, thông
                 tin người ký nội bộ và kiểm tra trạng thái chứng thư RSSP.</p>
             </div>
-            <button type="button" class="btn btn-primary btn-sm" onclick="app.openAddUidModal()">
-              <i class="fa-solid fa-plus"></i> Thêm UID Mới
-            </button>
+            <div style="display: flex; gap: 8px;">
+              <button type="button" class="btn btn-outline btn-sm" onclick="app.bulkUpdateAddresses()" style="color: #38bdf8; border-color: rgba(56, 189, 248, 0.4);">
+                <i class="fa-solid fa-cloud-arrow-down"></i> Lấy Địa Chỉ Hàng Loạt
+              </button>
+              <button type="button" class="btn btn-secondary btn-sm" onclick="app.openGoogleSheetSyncModal()"
+                style="border-color: rgba(34, 197, 94, 0.4); color: #4ade80;">
+                <i class="fa-solid fa-file-excel"></i> Đồng Bộ Google Sheet
+              </button>
+              <button type="button" class="btn btn-primary btn-sm" onclick="app.openAddUidModal()">
+                <i class="fa-solid fa-plus"></i> Thêm UID Mới
+              </button>
+            </div>
           </div>
 
           <div class="table-container">
@@ -611,11 +625,14 @@
                   <th style="width: 40px;">STT</th>
                   <th>Người Ký / Đơn Vị</th>
                   <th>agreementUUID (UID)</th>
+                  <th>Mã Số Thuế</th>
+                  <th>Địa Chỉ</th>
                   <th>Số Điện Thoại</th>
+                  <th style="text-align: center;">Thời Hạn</th>
                   <th style="text-align: center;">File Đã Ký</th>
                   <th>Passcode</th>
                   <th>Trạng Thái</th>
-                  <th style="width: 220px; text-align: right;">Thao Tác</th>
+                  <th style="width: 250px; text-align: right;">Thao Tác</th>
                 </tr>
               </thead>
               <tbody id="uids-tbody">
@@ -767,6 +784,30 @@
               <input type="text" id="uid-input-dept" class="form-input" placeholder="Ví dụ: Ban Giám Đốc">
             </div>
           </div>
+          <details style="margin-bottom: 12px; font-size: 0.8rem;">
+            <summary style="cursor: pointer; color: var(--text-muted);"><i class="fa-solid fa-cookie-bite"></i> Cập nhật
+              Cookie CRM (Dành cho Lấy địa chỉ)</summary>
+            <div style="margin-top: 8px;">
+              <input type="text" id="crm-cookie-input" class="form-input"
+                placeholder="Nhập chuỗi Cookie từ tab Network (JSESSIONID=...; XSRF-TOKEN=...)"
+                style="font-size: 0.75rem; padding: 6px 10px;">
+            </div>
+          </details>
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label class="form-label" style="display: flex; justify-content: space-between;">
+                <span>Mã số thuế / CCCD:</span>
+                <a href="javascript:void(0)" onclick="app.fetchCompanyInfo()"
+                  style="font-size: 0.75rem; color: #38bdf8; text-decoration: underline;"><i
+                    class="fa-solid fa-cloud-arrow-down"></i> Lấy địa chỉ theo MST</a>
+              </label>
+              <input type="text" id="uid-input-taxid" class="form-input" placeholder="Ví dụ: 038079004321">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Địa chỉ / Tỉnh thành:</label>
+              <input type="text" id="uid-input-address" class="form-input" placeholder="Ví dụ: Hải Phòng hoặc Hà Nội">
+            </div>
+          </div>
           <div class="form-grid-2">
             <div class="form-group">
               <label class="form-label">Email:</label>
@@ -796,6 +837,118 @@
           <button type="submit" class="btn btn-primary btn-sm">Lưu Tài Khoản UID</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- Modal: Đồng Bộ Google Sheet (Google Sheet Auto-Sync) -->
+  <div class="modal-overlay" id="modal-googlesheet-sync">
+    <div class="modal-card modal-lg" style="max-width: 980px; max-height: 90vh; display: flex; flex-direction: column;">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-file-excel" style="color: #22c55e;"></i> Đồng Bộ Google Sheet Tự Động (eSignCloud)
+        </h3>
+        <button class="modal-close" onclick="app.closeModal('modal-googlesheet-sync')">&times;</button>
+      </div>
+      <div class="modal-body" style="overflow-y: auto; flex: 1; padding: 20px;">
+        <!-- Inputs section -->
+        <div
+          style="background: rgba(15,23,42,0.6); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 16px; margin-bottom: 16px;">
+          <div class="form-group" style="margin-bottom: 12px;">
+            <label class="form-label" style="display: flex; justify-content: space-between;">
+              <span><i class="fa-solid fa-link" style="color: var(--accent);"></i> <b>Đường dẫn Google Sheet
+                  (Spreadsheet URL)</b>:</span>
+              <span style="font-size: 0.75rem; color: var(--text-muted);">Hỗ trợ link xem công khai</span>
+            </label>
+            <input type="text" id="gsync-sheet-url" class="form-input"
+              value="https://docs.google.com/spreadsheets/d/1HOlhpTboQragrjYgk7Iw3WqEsFXDDpx6/edit?gid=833688207#gid=833688207"
+              placeholder="https://docs.google.com/spreadsheets/d/...">
+          </div>
+
+          <div class="form-group" style="margin-bottom: 12px;">
+            <label class="form-label" style="display: flex; justify-content: space-between;">
+              <span><i class="fa-solid fa-bolt" style="color: #fbbf24;"></i> <b>Webhook URL Google Apps Script (Tùy chọn
+                  - Cập nhật trực tiếp vào Sheet)</b>:</span>
+              <a href="javascript:void(0)" onclick="app.toggleAppsScriptGuide()"
+                style="font-size: 0.75rem; color: #38bdf8; text-decoration: underline;">Xem mã Apps Script 30s</a>
+            </label>
+            <input type="text" id="gsync-webhook-url" class="form-input"
+              placeholder="Ví dụ: https://script.google.com/macros/s/AKfycb.../exec">
+          </div>
+
+          <!-- Apps Script Helper Accordion -->
+          <div id="gsync-guide-box"
+            style="display: none; background: rgba(0,0,0,0.3); border: 1px dashed rgba(56,189,248,0.4); border-radius: var(--radius-sm); padding: 12px; margin-bottom: 12px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+              <strong style="color: #38bdf8; font-size: 0.8rem;"><i class="fa-brands fa-google"></i> Hướng dẫn gắn
+                Webhook 1-click vào Google Sheet:</strong>
+              <button type="button" class="btn btn-outline btn-sm" onclick="app.copyAppsScriptCode()"
+                style="padding: 2px 8px; font-size: 0.72rem;">
+                <i class="fa-solid fa-copy"></i> Sao Chép Mã Script
+              </button>
+            </div>
+            <ol style="font-size: 0.78rem; color: #cbd5e1; margin: 0; padding-left: 20px; line-height: 1.5;">
+              <li>Mở Google Sheet của bạn -> Chọn <b>Tiện ích mở rộng (Extensions)</b> -> <b>Apps Script</b>.</li>
+              <li>Dán mã script bên dưới và bấm <b>Triển khai (Deploy)</b> -> <b>Tùy chọn triển khai mới (New
+                  deployment)</b>.</li>
+              <li>Chọn loại: <b>Ứng dụng web (Web app)</b>, mục Ai có quyền truy cập: <b>Bất kỳ ai (Anyone)</b> -> Bấm
+                <b>Triển khai</b> và dán link Webhook vào ô trên.</li>
+            </ol>
+            <textarea id="gsync-script-code" readonly
+              style="width: 100%; height: 95px; margin-top: 8px; font-family: monospace; font-size: 0.72rem; background: #0f172a; color: #a5f3fc; border: 1px solid #334155; border-radius: 4px; padding: 6px;"></textarea>
+          </div>
+
+          <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <button type="button" class="btn btn-primary btn-sm" id="gsync-btn-start"
+              onclick="app.handleGoogleSheetSync()">
+              <i class="fa-solid fa-arrows-rotate"></i> 1. Quét & Tra Cứu Tự Động từ RSSP
+            </button>
+            <button type="button" class="btn btn-secondary btn-sm" id="gsync-btn-push"
+              onclick="app.handlePushToGoogleSheet()" style="display: none; border-color: #22c55e; color: #4ade80;">
+              <i class="fa-solid fa-cloud-arrow-up"></i> 2. Đẩy Dữ Liệu Lên Google Sheet (Webhook)
+            </button>
+            <button type="button" class="btn btn-outline btn-sm" id="gsync-btn-download"
+              onclick="app.handleDownloadUpdatedCsv()" style="display: none;">
+              <i class="fa-solid fa-file-csv"></i> 3. Tải File CSV Đã Điền Đầy Đủ
+            </button>
+          </div>
+        </div>
+
+        <!-- Sync Progress / Summary Box -->
+        <div id="gsync-status-box" style="display: none; margin-bottom: 14px;">
+          <!-- Injected via JS -->
+        </div>
+
+        <!-- Results Table -->
+        <div id="gsync-results-container" style="display: none;">
+          <h5
+            style="font-size: 0.9rem; color: #f8fafc; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
+            <span><i class="fa-solid fa-list-check" style="color: var(--accent);"></i> Danh Sách Tra Cứu Chi Tiết (<span
+                id="gsync-count-total">0</span> dòng)</span>
+            <span style="font-size: 0.75rem; color: var(--text-muted);">Tự động đồng bộ vào Danh Bạ Quản Trị</span>
+          </h5>
+          <div class="table-container" style="max-height: 380px; overflow-y: auto;">
+            <table class="data-table" id="gsync-results-table">
+              <thead>
+                <tr>
+                  <th style="width: 45px;">Dòng</th>
+                  <th>agreementUUID</th>
+                  <th>Passcode</th>
+                  <th>Ngày BĐ Sử Dụng</th>
+                  <th>Tên HKD / Chủ Thể</th>
+                  <th>Mã Số Thuế</th>
+                  <th>Trạng Thái</th>
+                </tr>
+              </thead>
+              <tbody id="gsync-results-tbody">
+                <!-- Rows injected via JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary btn-sm" onclick="app.closeModal('modal-googlesheet-sync')">Đóng</button>
+      </div>
     </div>
   </div>
 

@@ -742,6 +742,120 @@ namespace eSignCloudWeb.Services
             return fallbackUid;
         }
 
+        public static string ExtractTaxId(SignCloudResp? resp, string? certDn)
+        {
+            if (resp?.agreementDetails != null)
+            {
+                if (!string.IsNullOrWhiteSpace(resp.agreementDetails.taxID))
+                    return resp.agreementDetails.taxID.Trim();
+                if (!string.IsNullOrWhiteSpace(resp.agreementDetails.citizenID))
+                    return resp.agreementDetails.citizenID.Trim();
+                if (!string.IsNullOrWhiteSpace(resp.agreementDetails.personalID))
+                    return resp.agreementDetails.personalID.Trim();
+                if (!string.IsNullOrWhiteSpace(resp.agreementDetails.budgetID))
+                    return resp.agreementDetails.budgetID.Trim();
+            }
+
+            return ExtractTaxIdFromDN(certDn);
+        }
+
+        public static string ExtractTaxIdFromDN(string? dn)
+        {
+            if (string.IsNullOrWhiteSpace(dn)) return "";
+
+            // 1. UID=MST:038079004321 or UID=CCCD:001090123456 or UID=CMND:... or UID=038079004321
+            var mUidMst = Regex.Match(dn, @"UID\s*=\s*(?:MST|CCCD|CMND)?[:\s]*([A-Za-z0-9-]+)", RegexOptions.IgnoreCase);
+            if (mUidMst.Success && !string.IsNullOrWhiteSpace(mUidMst.Groups[1].Value))
+            {
+                return mUidMst.Groups[1].Value.Trim();
+            }
+
+            // 2. OID.2.5.4.97=VATVN-0101234567 or 2.5.4.97=...
+            var mOid97 = Regex.Match(dn, @"(?:OID\.)?2\.5\.4\.97\s*=\s*(?:VATVN-|VATMST:|VAT-|MST:)?([A-Za-z0-9-]+)", RegexOptions.IgnoreCase);
+            if (mOid97.Success && !string.IsNullOrWhiteSpace(mOid97.Groups[1].Value))
+            {
+                return mOid97.Groups[1].Value.Trim();
+            }
+
+            // 3. MST=038079004321 or MST: 038079004321
+            var mMst = Regex.Match(dn, @"(?:MST|TIN)\s*[:=]\s*([0-9-]{9,14})", RegexOptions.IgnoreCase);
+            if (mMst.Success && !string.IsNullOrWhiteSpace(mMst.Groups[1].Value))
+            {
+                return mMst.Groups[1].Value.Trim();
+            }
+
+            // 4. SERIALNUMBER=MST:038079004321 or OID.2.5.4.5=MST:...
+            var mSerialMst = Regex.Match(dn, @"(?:SERIALNUMBER|OID\.2\.5\.4\.5)\s*=\s*(?:MST:)?([A-Za-z0-9-]+)", RegexOptions.IgnoreCase);
+            if (mSerialMst.Success && !string.IsNullOrWhiteSpace(mSerialMst.Groups[1].Value))
+            {
+                string val = mSerialMst.Groups[1].Value.Trim();
+                if (val.Length >= 9 && (val.Contains("-") || val.All(char.IsDigit)))
+                {
+                    return val;
+                }
+            }
+
+            // 5. In CN: (MST: 038079004321) or - MST: 038079004321
+            var mCnMst = Regex.Match(dn, @"(?:MST|CCCD|CMND)[:\s]+([0-9-]{9,14})", RegexOptions.IgnoreCase);
+            if (mCnMst.Success && !string.IsNullOrWhiteSpace(mCnMst.Groups[1].Value))
+            {
+                return mCnMst.Groups[1].Value.Trim();
+            }
+
+            return "";
+        }
+
+        public static string ExtractAddress(SignCloudResp? resp, string? certDn)
+        {
+            if (resp?.agreementDetails != null)
+            {
+                var parts = new List<string>();
+                if (!string.IsNullOrWhiteSpace(resp.agreementDetails.location))
+                    parts.Add(resp.agreementDetails.location.Trim());
+                if (!string.IsNullOrWhiteSpace(resp.agreementDetails.stateOrProvince) &&
+                    !parts.Any(p => p.Equals(resp.agreementDetails.stateOrProvince.Trim(), StringComparison.OrdinalIgnoreCase)))
+                    parts.Add(resp.agreementDetails.stateOrProvince.Trim());
+                if (parts.Count > 0)
+                    return string.Join(", ", parts);
+            }
+
+            return ExtractAddressFromDN(certDn);
+        }
+
+        public static string ExtractAddressFromDN(string? dn)
+        {
+            if (string.IsNullOrWhiteSpace(dn)) return "";
+
+            var parts = new List<string>();
+
+            // STREET=...
+            var mStreet = Regex.Match(dn, @"(?:STREET)\s*=\s*([^,]+)", RegexOptions.IgnoreCase);
+            if (mStreet.Success && !string.IsNullOrWhiteSpace(mStreet.Groups[1].Value))
+            {
+                parts.Add(mStreet.Groups[1].Value.Trim());
+            }
+
+            // L=... (Locality)
+            var mL = Regex.Match(dn, @"(?<![A-Za-z0-9])L\s*=\s*([^,]+)", RegexOptions.IgnoreCase);
+            if (mL.Success && !string.IsNullOrWhiteSpace(mL.Groups[1].Value))
+            {
+                string lVal = mL.Groups[1].Value.Trim();
+                if (!parts.Any(p => p.Equals(lVal, StringComparison.OrdinalIgnoreCase)))
+                    parts.Add(lVal);
+            }
+
+            // ST=... or STATE=... (State / Province)
+            var mSt = Regex.Match(dn, @"(?<![A-Za-z0-9])(?:ST|STATE)\s*=\s*([^,]+)", RegexOptions.IgnoreCase);
+            if (mSt.Success && !string.IsNullOrWhiteSpace(mSt.Groups[1].Value))
+            {
+                string stVal = mSt.Groups[1].Value.Trim();
+                if (!parts.Any(p => p.Equals(stVal, StringComparison.OrdinalIgnoreCase)))
+                    parts.Add(stVal);
+            }
+
+            return parts.Count > 0 ? string.Join(", ", parts) : "";
+        }
+
         private static string GetMimeType(string fileName)
         {
             string ext = Path.GetExtension(fileName).ToLowerInvariant();

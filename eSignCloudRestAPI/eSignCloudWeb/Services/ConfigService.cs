@@ -248,6 +248,19 @@ namespace eSignCloudWeb.Services
                 }
             }
 
+            // Auto-extract TaxId and Address from CertificateDN if empty
+            foreach (var acc in config.Accounts)
+            {
+                if (string.IsNullOrWhiteSpace(acc.TaxId) && !string.IsNullOrWhiteSpace(acc.CertificateDN))
+                {
+                    acc.TaxId = ESignCloudService.ExtractTaxIdFromDN(acc.CertificateDN);
+                }
+                if (string.IsNullOrWhiteSpace(acc.Address) && !string.IsNullOrWhiteSpace(acc.CertificateDN))
+                {
+                    acc.Address = ESignCloudService.ExtractAddressFromDN(acc.CertificateDN);
+                }
+            }
+
             SaveAccountsBackup(config.Accounts);
 
             try

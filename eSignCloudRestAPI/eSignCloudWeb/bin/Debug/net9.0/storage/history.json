@@ -1120,5 +1120,27 @@
     "Status": "Thành công",
     "Reason": "",
     "Location": ""
+  },
+  {
+    "Id": "4a43d5573e4042fcb575838a98eacb5e",
+    "AgreementUUID": "3ff6f7d9-e629-4c6d-bec0-682024dfd063",
+    "OriginalFileName": "Đơn cấp gp Phạm Văn Dũng.pdf",
+    "SignedFileName": "Đơn cấp gp Phạm Văn Dũng.signed.pdf",
+    "MimeType": "application/pdf",
+    "FileSize": 422042,
+    "SignDate": "2026-08-28T11:10:19.1660356+07:00",
+    "BillCode": "BK-260828110739-8991683940-175372",
+    "ResponseCode": 1018,
+    "ResponseMessage": "SUCCESSFULLY. PLEASE CHANGE THE PASSPHRASE",
+    "CertificateDN": "C=VN,ST=Hải Phòng,O=NGUYỄN THỊ HUYỀN,CN=NGUYỄN THỊ HUYỀN,UID=MST:031187010749",
+    "CertificateSerialNumber": "54011215A01069C407DCDFA22A24A314",
+    "IssuerDN": "C=VN,O=I-CA,CN=I-CA SHA-256",
+    "ValidFrom": 1787825671000,
+    "ValidTo": 1819448071000,
+    "OriginalFilePath": "E:\\project\\KySo-Icorp\\eSignCloudRestAPI\\eSignCloudWeb\\storage\\uploads\\3ff6f7d9-e629-4c6d-bec0-682024dfd063\\4a43d5573e4042fcb575838a98eacb5e_Đơn cấp gp Phạm Văn Dũng.pdf",
+    "SignedFilePath": "E:\\project\\KySo-Icorp\\eSignCloudRestAPI\\eSignCloudWeb\\storage\\signed\\3ff6f7d9-e629-4c6d-bec0-682024dfd063\\4a43d5573e4042fcb575838a98eacb5e_Đơn cấp gp Phạm Văn Dũng.signed.pdf",
+    "Status": "Thành công",
+    "Reason": "",
+    "Location": ""
   }
 ]

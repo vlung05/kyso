@@ -93,3 +93,14 @@ E:\project\eSignCloudRestAPI\eSignCloudRestAPI\obj\Debug\eSignCloudRestAPI.cspro
 E:\project\eSignCloudRestAPI\eSignCloudRestAPI\obj\Debug\eSignClo.47F0C97B.Up2Date
 E:\project\eSignCloudRestAPI\eSignCloudRestAPI\obj\Debug\eSignCloudRestAPI.exe
 E:\project\eSignCloudRestAPI\eSignCloudRestAPI\obj\Debug\eSignCloudRestAPI.pdb
+E:\project\KySo-Icorp\eSignCloudRestAPI\eSignCloudRestAPI\bin\Debug\eSignCloudRestAPI.exe.config
+E:\project\KySo-Icorp\eSignCloudRestAPI\eSignCloudRestAPI\bin\Debug\eSignCloudRestAPI.exe
+E:\project\KySo-Icorp\eSignCloudRestAPI\eSignCloudRestAPI\bin\Debug\eSignCloudRestAPI.pdb
+E:\project\KySo-Icorp\eSignCloudRestAPI\eSignCloudRestAPI\bin\Debug\BouncyCastle.Crypto.dll
+E:\project\KySo-Icorp\eSignCloudRestAPI\eSignCloudRestAPI\bin\Debug\Newtonsoft.Json.dll
+E:\project\KySo-Icorp\eSignCloudRestAPI\eSignCloudRestAPI\obj\Debug\eSignCloudRestAPI.csproj.AssemblyReference.cache
+E:\project\KySo-Icorp\eSignCloudRestAPI\eSignCloudRestAPI\obj\Debug\eSignCloudRestAPI.exe.config
+E:\project\KySo-Icorp\eSignCloudRestAPI\eSignCloudRestAPI\obj\Debug\eSignCloudRestAPI.csproj.CoreCompileInputs.cache
+E:\project\KySo-Icorp\eSignCloudRestAPI\eSignCloudRestAPI\obj\Debug\eSignClo.47F0C97B.Up2Date
+E:\project\KySo-Icorp\eSignCloudRestAPI\eSignCloudRestAPI\obj\Debug\eSignCloudRestAPI.exe
+E:\project\KySo-Icorp\eSignCloudRestAPI\eSignCloudRestAPI\obj\Debug\eSignCloudRestAPI.pdb

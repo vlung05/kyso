@@ -637,29 +637,125 @@ class AppController {
     this.renderUidsTable();
   }
 
+  extractTaxId(acc) {
+    if (!acc) return '';
+    if (acc.taxId && acc.taxId.trim() !== '') return acc.taxId.trim();
+    if (acc.taxCode && acc.taxCode.trim() !== '') return acc.taxCode.trim();
+    return this.extractTaxIdFromDn(acc.certificateDN) || '';
+  }
+
+  extractTaxIdFromDn(dn) {
+    if (!dn) return '';
+    // 1. UID=MST:038079004321 or UID=CCCD:... or UID=CMND:... or UID=038079004321
+    let m = dn.match(/UID\s*=\s*(?:MST|CCCD|CMND)?[:\s]*([A-Za-z0-9-]+)/i);
+    if (m && m[1]) return m[1].trim();
+
+    // 2. OID.2.5.4.97=...
+    m = dn.match(/(?:OID\.)?2\.5\.4\.97\s*=\s*(?:VATVN-|VATMST:|VAT-|MST:)?([A-Za-z0-9-]+)/i);
+    if (m && m[1]) return m[1].trim();
+
+    // 3. MST: ...
+    m = dn.match(/(?:MST|TIN)\s*[:=]\s*([0-9-]{9,14})/i);
+    if (m && m[1]) return m[1].trim();
+
+    // 4. SERIALNUMBER=MST:...
+    m = dn.match(/(?:SERIALNUMBER|OID\.2\.5\.4\.5)\s*=\s*(?:MST:)?([A-Za-z0-9-]+)/i);
+    if (m && m[1] && m[1].length >= 9) return m[1].trim();
+
+    // 5. In CN: (MST: 038079004321)
+    m = dn.match(/(?:MST|CCCD|CMND)[:\s]+([0-9-]{9,14})/i);
+    if (m && m[1]) return m[1].trim();
+
+    return '';
+  }
+
+  extractAddress(acc) {
+    if (!acc) return '';
+    if (acc.address && acc.address.trim() !== '') return acc.address.trim();
+    return this.extractAddressFromDn(acc.certificateDN) || '';
+  }
+
+  extractAddressFromDn(dn) {
+    if (!dn) return '';
+    const parts = [];
+
+    // STREET=...
+    const mStreet = dn.match(/STREET\s*=\s*([^,]+)/i);
+    if (mStreet && mStreet[1]) parts.push(mStreet[1].trim());
+
+    // L=...
+    const mL = dn.match(/(?:^|[,;])\s*L\s*=\s*([^,]+)/i);
+    if (mL && mL[1]) {
+      const lVal = mL[1].trim();
+      if (!parts.includes(lVal)) parts.push(lVal);
+    }
+
+    // ST=... or STATE=...
+    const mSt = dn.match(/(?:^|[,;])\s*(?:ST|STATE)\s*=\s*([^,]+)/i);
+    if (mSt && mSt[1]) {
+      const stVal = mSt[1].trim();
+      if (!parts.includes(stVal)) parts.push(stVal);
+    }
+
+    return parts.join(', ');
+  }
+
   renderUidsTable() {
     const tbody = document.getElementById('uids-tbody');
     if (!tbody) return;
     const accounts = this.config?.accounts || [];
 
     if (accounts.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 24px;">Chưa có tài khoản UID nào. Hãy bấm "Thêm UID Mới".</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="10" style="text-align: center; color: var(--text-muted); padding: 24px;">Chưa có tài khoản UID nào. Hãy bấm "Thêm UID Mới".</td></tr>`;
       return;
     }
+    const sortedAccounts = [...accounts].sort((a, b) => {
+      const aTime = a.validFrom ? new Date(a.validFrom).getTime() : 0;
+      const bTime = b.validFrom ? new Date(b.validFrom).getTime() : 0;
+      return bTime - aTime; 
+    });
 
-    tbody.innerHTML = accounts.map((acc, idx) => `
+    tbody.innerHTML = sortedAccounts.map((acc, idx) => {
+      const taxId = this.extractTaxId(acc);
+      const address = this.extractAddress(acc);
+
+      const validFromDate = acc.validFrom ? new Date(acc.validFrom) : null;
+      const validToDate = acc.validTo ? new Date(acc.validTo) : null;
+      let validToStr = '<span style="color: var(--text-muted); font-size: 0.8rem;">--</span>';
+      
+      if (validToDate || validFromDate) {
+        const isExpired = validToDate && validToDate < new Date();
+        const color = isExpired ? '#f87171' : '#38bdf8';
+        const iconTo = isExpired ? 'fa-calendar-xmark' : 'fa-calendar-check';
+        
+        validToStr = `<div style="display: flex; flex-direction: column; gap: 3px; font-size: 0.75rem; text-align: left; justify-content: center; min-width: 80px;">
+          ${validFromDate ? `<span style="color: #cbd5e1;" title="Ngày bắt đầu"><i class="fa-regular fa-calendar-plus" style="margin-right: 4px; opacity: 0.7;"></i>${validFromDate.toLocaleDateString('vi-VN')}</span>` : ''}
+          ${validToDate ? `<span style="color: ${color};" title="Ngày hết hạn"><i class="fa-regular ${iconTo}" style="margin-right: 4px;"></i>${validToDate.toLocaleDateString('vi-VN')}</span>` : ''}
+        </div>`;
+      }
+
+      return `
       <tr>
         <td style="font-family: monospace; color: var(--text-muted);">${idx + 1}</td>
         <td>
           <div style="display: flex; align-items: center; gap: 8px;">
-            <div class="user-avatar" style="width: 26px; height: 26px; font-size: 11px;">${(acc.signerName || 'U').charAt(0).toUpperCase()}</div>
-            <strong>${acc.signerName || 'Chưa đặt tên'}</strong>
+            <div>
+              <strong>${acc.signerName || 'Chưa đặt tên'}</strong>
+              ${acc.department ? `<div style="font-size: 0.75rem; color: var(--text-muted);">${acc.department}</div>` : ''}
+            </div>
           </div>
         </td>
-        <td><code style="color: var(--accent); font-size: 0.8rem;">${acc.agreementUUID}</code></td>
+        <td><code style="color: var(--accent); font-size: 0.8rem;">${acc.agreementUUID}</code></td>        
+        <td>
+          ${taxId ? `<span style="color: #f59e0b; font-size: 0.85rem; font-weight: 500;">${taxId}</span>` : '<span style="color: var(--text-muted); font-size: 0.8rem;">--</span>'}
+        </td>
+        <td>
+          ${address ? `<span style="color: #cbd5e1; font-size: 0.82rem; display: inline-flex; align-items: center; gap: 4px;" title="${address}"><i class="fa-solid fa-location-dot" style="font-size: 0.72rem; color: #f43f5e; opacity: 0.85;"></i>${address}</span>` : '<span style="color: var(--text-muted); font-size: 0.8rem;">--</span>'}
+        </td>
         <td>
           ${acc.phone ? `<span style="color: #38bdf8; font-family: monospace; font-size: 0.82rem; display: inline-flex; align-items: center; gap: 4px;"><i class="fa-solid fa-phone" style="font-size: 0.72rem; opacity: 0.75;"></i>${acc.phone}</span>` : '<span style="color: var(--text-muted); font-size: 0.8rem;">--</span>'}
         </td>
+        <td style="text-align: center;">${validToStr}</td>
         <td style="text-align: center;">
           <span class="badge-fmt" style="background: rgba(56, 189, 248, 0.12); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.25); padding: 3px 9px; border-radius: 12px; font-weight: 600; font-size: 0.78rem; display: inline-flex; align-items: center; gap: 4px;">
             <i class="fa-solid fa-file-circle-check"></i> ${acc.signedCount || 0}
@@ -668,9 +764,12 @@ class AppController {
         <td><span style="font-family: monospace; color: #cbd5e1;">••••••••</span></td>
         <td><span class="status-badge success"><i class="fa-solid fa-circle-check"></i> ${acc.status || 'Hoạt động'}</span></td>
         <td>
-          <div class="actions-cell" style="justify-content: flex-end;">
+          <div class="actions-cell" style="justify-content: flex-end; gap: 4px;">
             <button type="button" class="btn btn-secondary btn-sm" onclick="app.verifyUidCertificate('${acc.agreementUUID}', '${acc.defaultPasscode}')" title="Kiểm tra chứng thư RSSP">
               <i class="fa-solid fa-certificate"></i>
+            </button>
+            <button type="button" class="btn btn-outline btn-sm" onclick="app.openEditUidModal('${acc.agreementUUID}')" title="Chỉnh sửa thông tin" style="color: #38bdf8; border-color: rgba(56, 189, 248, 0.3);">
+              <i class="fa-solid fa-pen-to-square"></i>
             </button>
             <button type="button" class="btn btn-primary btn-sm" onclick="app.switchToUid('${acc.agreementUUID}', '${acc.defaultPasscode}', '${acc.signerName}')" title="Đăng nhập & Ký bằng UID này">
               <i class="fa-solid fa-arrow-right-to-bracket"></i> Ký
@@ -681,26 +780,199 @@ class AppController {
           </div>
         </td>
       </tr>
-    `).join('');
+      `;
+    }).join('');
+  }
+
+  async bulkUpdateAddresses() {
+    const crmCookieInput = document.getElementById('crm-cookie-input');
+    let crmCookie = crmCookieInput ? crmCookieInput.value.trim() : '';
+    if (!crmCookie) {
+      crmCookie = localStorage.getItem('eSign_crm_cookie') || '';
+    }
+    if (!crmCookie) {
+      this.showToast('Vui lòng nhập Cookie CRM trước khi cập nhật hàng loạt!', 'warning');
+      this.openAddUidModal();
+      return;
+    }
+
+    const accounts = this.config?.accounts || [];
+    let updatedCount = 0;
+
+    if (accounts.length === 0) {
+      this.showToast('Không có UID nào trong danh sách.', 'info');
+      return;
+    }
+
+    this.showToast('Đang tiến hành lấy địa chỉ hàng loạt...', 'info');
+
+    for (let i = 0; i < accounts.length; i++) {
+      const acc = accounts[i];
+      const taxId = this.extractTaxId(acc);
+      if (!taxId) continue;
+
+      try {
+        const formData = new FormData();
+        formData.append('vMST', taxId);
+        formData.append('crmCookie', crmCookie);
+
+        const resp = await fetch('/api/proxy/crm-company-info', { method: 'POST', body: formData });
+        if (resp.ok) {
+          const data = await resp.json();
+          if (data && data.length > 0) {
+            const info = data[0];
+            if (info.Code === "LOGIN") {
+              this.showToast('Phiên đăng nhập CRM đã hết hạn. Đang dừng tiến trình.', 'error');
+              break;
+            }
+            const name = info.TEN_GOI || info.COMPANY_NAME || info.NAME || '';
+            const address = info.DIA_CHI || info.ADDRESS || info.COMPANY_ADDRESS || '';
+            const email = info.EMAIL || '';
+            const phone = info.DIEN_THOAI || info.PHONE || info.MOBILE || '';
+
+            let changed = false;
+            if (name && acc.signerName !== name) { acc.signerName = name; changed = true; }
+            if (address && acc.address !== address) { acc.address = address; changed = true; }
+            if (email && acc.email !== email) { acc.email = email; changed = true; }
+            if (phone && acc.phone !== phone) { acc.phone = phone; changed = true; }
+
+            if (changed) updatedCount++;
+          }
+        }
+      } catch (e) {
+        console.error('Lỗi khi cập nhật hàng loạt cho MST ' + taxId, e);
+      }
+    }
+
+    if (updatedCount > 0) {
+      try {
+        const resp = await fetch('/api/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(this.config)
+        });
+        if (resp.ok) {
+          this.renderUidsTable();
+          this.showToast(`Đã lấy thông tin thành công cho ${updatedCount} UID!`, 'success');
+        } else {
+          this.showToast('Lỗi lưu cấu hình sau khi cập nhật.', 'error');
+        }
+      } catch (err) {
+        this.showToast('Lỗi lưu cấu hình: ' + err.message, 'error');
+      }
+    } else {
+      this.showToast('Không có thay đổi nào được cập nhật.', 'info');
+    }
+  }
+
+  async fetchCompanyInfo() {
+    const taxIdInput = document.getElementById('uid-input-taxid');
+    const taxId = taxIdInput.value.trim();
+    if (!taxId) {
+      this.showToast('Vui lòng nhập Mã số thuế trước!', 'error');
+      return;
+    }
+
+    const crmCookieInput = document.getElementById('crm-cookie-input');
+    const crmCookie = crmCookieInput ? crmCookieInput.value.trim() : '';
+    if (crmCookie) {
+      localStorage.setItem('eSign_crm_cookie', crmCookie);
+    }
+    const finalCookie = crmCookie || localStorage.getItem('eSign_crm_cookie') || '';
+
+    this.showToast('Đang lấy thông tin doanh nghiệp từ CRM...', 'info');
+    try {
+      const formData = new FormData();
+      formData.append('vMST', taxId);
+      formData.append('crmCookie', finalCookie);
+
+      const resp = await fetch('/api/proxy/crm-company-info', {
+        method: 'POST',
+        body: formData
+      });
+      if (!resp.ok) {
+        throw new Error(`HTTP error! status: ${resp.status}`);
+      }
+      const data = await resp.json();
+      if (data && data.length > 0) {
+        const info = data[0];
+        if (info.Code === "LOGIN") {
+          this.showToast('Phiên đăng nhập CRM đã hết hạn. Vui lòng cập nhật lại chuỗi Cookie!', 'error');
+          return;
+        }
+        const name = info.TEN_GOI || info.COMPANY_NAME || info.NAME || '';
+        const address = info.DIA_CHI || info.ADDRESS || info.COMPANY_ADDRESS || '';
+        const email = info.EMAIL || '';
+        const phone = info.DIEN_THOAI || info.PHONE || info.MOBILE || '';
+
+        if (name) {
+          document.getElementById('uid-input-name').value = name;
+        }
+        if (address) {
+          document.getElementById('uid-input-address').value = address;
+        }
+        if (email) {
+          document.getElementById('uid-input-email').value = email;
+        }
+        if (phone) {
+          document.getElementById('uid-input-phone').value = phone;
+        }
+        this.showToast('Đã lấy thông tin doanh nghiệp thành công!', 'success');
+      } else {
+        this.showToast('Không tìm thấy thông tin cho MST này!', 'warning');
+      }
+    } catch (err) {
+      this.showToast('Lỗi lấy thông tin: ' + err.message, 'error');
+    }
   }
 
   openAddUidModal() {
-    document.getElementById('uid-input-uuid').value = '';
+    const titleEl = document.getElementById('modal-uid-title');
+    if (titleEl) titleEl.innerHTML = '<i class="fa-solid fa-user-plus"></i> Thêm Tài Khoản UID Mới';
+    const uuidInput = document.getElementById('uid-input-uuid');
+    uuidInput.value = '';
+    uuidInput.removeAttribute('readonly');
     document.getElementById('uid-input-name').value = '';
     document.getElementById('uid-input-dept').value = '';
+    document.getElementById('uid-input-taxid').value = '';
+    document.getElementById('uid-input-address').value = '';
     document.getElementById('uid-input-email').value = '';
     document.getElementById('uid-input-phone').value = '';
     document.getElementById('uid-input-passcode').value = '12345678';
     document.getElementById('uid-input-status').value = 'Hoạt động';
+    const crmCookieInput = document.getElementById('crm-cookie-input');
+    if (crmCookieInput) crmCookieInput.value = localStorage.getItem('eSign_crm_cookie') || '';
     this.openModal('modal-add-uid');
   }
 
+  openEditUidModal(uuid) {
+    const acc = (this.config?.accounts || []).find(a => a.agreementUUID.toLowerCase() === uuid.toLowerCase());
+    if (!acc) return;
+
+    const titleEl = document.getElementById('modal-uid-title');
+    if (titleEl) titleEl.innerHTML = '<i class="fa-solid fa-user-pen"></i> Chỉnh Sửa Tài Khoản UID';
+    const uuidInput = document.getElementById('uid-input-uuid');
+    uuidInput.value = acc.agreementUUID || '';
+    document.getElementById('uid-input-name').value = acc.signerName || '';
+    document.getElementById('uid-input-dept').value = acc.department || '';
+    document.getElementById('uid-input-taxid').value = this.extractTaxId(acc) || '';
+    document.getElementById('uid-input-address').value = this.extractAddress(acc) || '';
+    document.getElementById('uid-input-email').value = acc.email || '';
+    document.getElementById('uid-input-phone').value = acc.phone || '';
+    document.getElementById('uid-input-passcode').value = acc.defaultPasscode || '12345678';
+    document.getElementById('uid-input-status').value = acc.status || 'Hoạt động';
+    const crmCookieInput = document.getElementById('crm-cookie-input');
+    if (crmCookieInput) crmCookieInput.value = localStorage.getItem('eSign_crm_cookie') || '';
+    this.openModal('modal-add-uid');
+  }
   async handleSaveUid(event) {
     event.preventDefault();
     const account = {
       agreementUUID: document.getElementById('uid-input-uuid').value.trim(),
       signerName: document.getElementById('uid-input-name').value.trim(),
       department: document.getElementById('uid-input-dept').value.trim(),
+      taxId: document.getElementById('uid-input-taxid').value.trim(),
+      address: document.getElementById('uid-input-address').value.trim(),
       email: document.getElementById('uid-input-email').value.trim(),
       phone: document.getElementById('uid-input-phone').value.trim(),
       defaultPasscode: document.getElementById('uid-input-passcode').value.trim(),
@@ -756,12 +1028,28 @@ class AppController {
       });
       const data = await resp.json();
       if (data.success) {
+        // Sync verified details back to local accounts
+        const existing = (this.config?.accounts || []).find(a => a.agreementUUID.toLowerCase() === uuid.toLowerCase());
+        if (existing) {
+          if (data.signerName) existing.signerName = data.signerName;
+          if (data.taxId) existing.taxId = data.taxId;
+          if (data.address) existing.address = data.address;
+          if (data.certificateDN) existing.certificateDN = data.certificateDN;
+          if (data.serialNumber) existing.certificateSerialNumber = data.serialNumber;
+          if (data.issuerDN) existing.issuerDN = data.issuerDN;
+          if (data.validFrom) existing.validFrom = data.validFrom;
+          if (data.validTo) existing.validTo = data.validTo;
+          this.renderUidsTable();
+        }
+
         const body = document.getElementById('modal-cert-body');
         body.innerHTML = `
           <div style="background: rgba(15,23,42,0.6); padding: 16px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
             <div style="margin-bottom: 10px;"><span style="color: var(--text-muted);">UID:</span> <code>${uuid}</code></div>
             <div style="margin-bottom: 10px;"><span style="color: var(--text-muted);">Tên chủ chứng thư:</span> <strong>${data.signerName || 'N/A'}</strong></div>
-            <div style="margin-bottom: 10px;"><span style="color: var(--text-muted);">Certificate DN:</span> <div style="font-size: 0.85rem;">${data.certificateDN || 'N/A'}</div></div>
+            ${data.taxId ? `<div style="margin-bottom: 10px;"><span style="color: var(--text-muted);">Mã số thuế / MST:</span> <code style="color: #f59e0b; font-weight: 600; font-size: 0.9rem;">${data.taxId}</code></div>` : ''}
+            ${data.address ? `<div style="margin-bottom: 10px;"><span style="color: var(--text-muted);">Địa chỉ / Tỉnh thành:</span> <span style="color: #e2e8f0; font-weight: 500;">${data.address}</span></div>` : ''}
+            <div style="margin-bottom: 10px;"><span style="color: var(--text-muted);">Certificate DN:</span> <div style="font-size: 0.85rem; word-break: break-all; color: #94a3b8; font-family: monospace;">${data.certificateDN || 'N/A'}</div></div>
             <div style="margin-bottom: 10px;"><span style="color: var(--text-muted);">Serial Number:</span> <code style="color: var(--accent);">${data.serialNumber || 'N/A'}</code></div>
             <div style="margin-bottom: 10px;">
               <span style="color: var(--text-muted);">Thời hạn hiệu lực:</span>
@@ -1234,6 +1522,321 @@ class AppController {
     } catch (err) {
       this.showToast('Lỗi: ' + err.message, 'error');
     }
+  }
+
+  // =================== GOOGLE SHEET SYNC ===================
+
+  openGoogleSheetSyncModal() {
+    // Reset UI state
+    const statusBox = document.getElementById('gsync-status-box');
+    const resultsContainer = document.getElementById('gsync-results-container');
+    const btnPush = document.getElementById('gsync-btn-push');
+    const btnDownload = document.getElementById('gsync-btn-download');
+    const btnStart = document.getElementById('gsync-btn-start');
+
+    if (statusBox) statusBox.style.display = 'none';
+    if (resultsContainer) resultsContainer.style.display = 'none';
+    if (btnPush) btnPush.style.display = 'none';
+    if (btnDownload) btnDownload.style.display = 'none';
+    if (btnStart) { btnStart.disabled = false; btnStart.innerHTML = '<i class="fa-solid fa-arrows-rotate"></i> 1. Quét & Tra Cứu Tự Động từ RSSP'; }
+
+    this._gSyncLastResult = null;
+    this.openModal('modal-googlesheet-sync');
+  }
+
+  async handleGoogleSheetSync() {
+    const sheetUrl = (document.getElementById('gsync-sheet-url')?.value || '').trim();
+    const webhookUrl = (document.getElementById('gsync-webhook-url')?.value || '').trim();
+
+    if (!sheetUrl) {
+      this.showToast('Vui lòng nhập đường dẫn Google Sheet!', 'error');
+      return;
+    }
+
+    const btnStart = document.getElementById('gsync-btn-start');
+    const statusBox = document.getElementById('gsync-status-box');
+    const resultsContainer = document.getElementById('gsync-results-container');
+    const btnPush = document.getElementById('gsync-btn-push');
+    const btnDownload = document.getElementById('gsync-btn-download');
+
+    // Show loading state
+    if (btnStart) {
+      btnStart.disabled = true;
+      btnStart.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang tra cứu RSSP...';
+    }
+    if (statusBox) {
+      statusBox.style.display = 'block';
+      statusBox.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 10px; padding: 14px 16px; background: rgba(56,189,248,0.08); border: 1px solid rgba(56,189,248,0.25); border-radius: var(--radius-md); color: #94a3b8;">
+          <i class="fa-solid fa-spinner fa-spin" style="color: #38bdf8; font-size: 1.1rem;"></i>
+          <span>Đang tải dữ liệu từ Google Sheet và tra cứu RSSP... Vui lòng đợi, quá trình này có thể mất vài giây.</span>
+        </div>`;
+    }
+    if (resultsContainer) resultsContainer.style.display = 'none';
+    if (btnPush) btnPush.style.display = 'none';
+    if (btnDownload) btnDownload.style.display = 'none';
+
+    try {
+      const resp = await fetch('/api/admin/googlesheet/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sheetUrl, webhookUrl, autoSaveToAccounts: true })
+      });
+
+      const data = await resp.json();
+      this._gSyncLastResult = data;
+
+      if (!data.success) {
+        if (statusBox) {
+          statusBox.innerHTML = `
+            <div style="padding: 14px 16px; background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); border-radius: var(--radius-md);">
+              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px; color: #f87171; font-weight: 600;">
+                <i class="fa-solid fa-circle-xmark"></i> Lỗi đồng bộ
+              </div>
+              <p style="color: #cbd5e1; font-size: 0.875rem; margin: 0;">${data.message || 'Không thể kết nối hoặc đọc dữ liệu từ Google Sheet.'}</p>
+            </div>`;
+        }
+        if (btnStart) { btnStart.disabled = false; btnStart.innerHTML = '<i class="fa-solid fa-arrows-rotate"></i> 1. Quét & Tra Cứu Tự Động từ RSSP'; }
+        return;
+      }
+
+      // Success summary
+      const updCount = data.updatedCount || 0;
+      const errCount = data.errorCount || 0;
+      const totalCount = data.processedCount || 0;
+      const hasWebhook = !!webhookUrl;
+
+      if (statusBox) {
+        statusBox.innerHTML = `
+          <div style="padding: 14px 16px; background: rgba(34,197,94,0.08); border: 1px solid rgba(34,197,94,0.3); border-radius: var(--radius-md);">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px; color: #4ade80; font-weight: 600;">
+              <i class="fa-solid fa-circle-check"></i> Đồng bộ thành công – ${data.message || ''}
+            </div>
+            <div style="display: flex; gap: 16px; flex-wrap: wrap;">
+              <div style="background: rgba(15,23,42,0.5); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 8px 14px; text-align: center; min-width: 80px;">
+                <div style="font-size: 1.4rem; font-weight: 700; color: #f8fafc;">${totalCount}</div>
+                <div style="font-size: 0.72rem; color: var(--text-muted);">Đã xử lý</div>
+              </div>
+              <div style="background: rgba(15,23,42,0.5); border: 1px solid rgba(34,197,94,0.35); border-radius: var(--radius-sm); padding: 8px 14px; text-align: center; min-width: 80px;">
+                <div style="font-size: 1.4rem; font-weight: 700; color: #4ade80;">${updCount}</div>
+                <div style="font-size: 0.72rem; color: var(--text-muted);">Thành công</div>
+              </div>
+              <div style="background: rgba(15,23,42,0.5); border: 1px solid rgba(239,68,68,0.3); border-radius: var(--radius-sm); padding: 8px 14px; text-align: center; min-width: 80px;">
+                <div style="font-size: 1.4rem; font-weight: 700; color: #f87171;">${errCount}</div>
+                <div style="font-size: 0.72rem; color: var(--text-muted);">Lỗi</div>
+              </div>
+            </div>
+            ${data.webhookSent !== undefined ? `<div style="margin-top: 10px; font-size: 0.8rem; color: ${data.webhookSent ? '#4ade80' : '#f87171'};">
+              <i class="fa-solid fa-${data.webhookSent ? 'cloud-arrow-up' : 'triangle-exclamation'}"></i>
+              Webhook: ${data.webhookMessage || (data.webhookSent ? 'Đã gửi' : 'Không gửi')}
+            </div>` : ''}
+          </div>`;
+      }
+
+      // Render rows table
+      if (resultsContainer && data.rows && data.rows.length > 0) {
+        resultsContainer.style.display = 'block';
+        document.getElementById('gsync-count-total').textContent = data.rows.length;
+        const tbody = document.getElementById('gsync-results-tbody');
+        if (tbody) {
+          tbody.innerHTML = data.rows.map(row => {
+            const isOk = row.isSuccess;
+            const nameChanged = row.newName && row.newName !== row.oldName;
+            const taxChanged = row.newTaxId && row.newTaxId !== row.oldTaxId;
+            const hasNewDate = !!row.newDate;
+
+            const dateHtml = hasNewDate
+              ? `<div style="display: flex; flex-direction: column; gap: 3px; font-size: 0.75rem; text-align: left; justify-content: center; min-width: 80px;">
+                  <span style="color: #cbd5e1;" title="Ngày bắt đầu"><i class="fa-regular fa-calendar-plus" style="margin-right: 4px; opacity: 0.7;"></i>${row.newDate}</span>
+                  ${row.newEndDate ? `<span style="color: #38bdf8;" title="Ngày hết hạn"><i class="fa-regular fa-calendar-check" style="margin-right: 4px;"></i>${row.newEndDate}</span>` : ''}
+                 </div>`
+              : `<span style="color: var(--text-muted); font-size: 0.8rem;">--</span>`;
+
+            const nameHtml = nameChanged
+              ? `<span style="color: #4ade80; font-weight: 600;">${row.newName}</span> <span style="color: var(--text-muted); font-size: 0.75rem; text-decoration: line-through;">${row.oldName || ''}</span>`
+              : `<span style="color: #e2e8f0;">${row.newName || row.oldName || '--'}</span>`;
+
+            const taxHtml = taxChanged
+              ? `<span style="color: #fbbf24; font-weight: 600; font-family: monospace;">${row.newTaxId}</span>`
+              : `<span style="color: ${row.newTaxId || row.oldTaxId ? '#f59e0b' : 'var(--text-muted)'}; font-family: monospace;">${row.newTaxId || row.oldTaxId || '--'}</span>`;
+
+            const statusBadge = isOk
+              ? `<span style="background: rgba(34,197,94,0.15); color: #4ade80; border: 1px solid rgba(34,197,94,0.3); border-radius: 4px; padding: 2px 8px; font-size: 0.75rem; white-space: nowrap;">✓ OK</span>`
+              : `<span style="background: rgba(239,68,68,0.12); color: #f87171; border: 1px solid rgba(239,68,68,0.25); border-radius: 4px; padding: 2px 8px; font-size: 0.75rem; white-space: nowrap;" title="${row.message || ''}">✗ Lỗi</span>`;
+
+            return `<tr style="opacity: ${isOk ? '1' : '0.65'};">
+              <td style="text-align: center; color: var(--text-muted);">${row.rowIndex}</td>
+              <td style="font-family: monospace; font-size: 0.78rem; color: #38bdf8;" title="${row.agreementUUID}">${(row.agreementUUID || '').substring(0, 18)}…</td>
+              <td style="font-family: monospace; font-size: 0.78rem; color: var(--text-muted);">${row.passcode || '--'}</td>
+              <td>${dateHtml}</td>
+              <td>${nameHtml}</td>
+              <td>'${taxHtml}</td>
+              <td>${statusBadge}</td>
+            </tr>`;
+          }).join('');
+        }
+      }
+
+      // Show push/download buttons
+      if (btnPush && hasWebhook) btnPush.style.display = '';
+      if (btnDownload && data.rows && data.rows.length > 0) btnDownload.style.display = '';
+
+      // Refresh the UID table in background
+      await this.loadConfig();
+
+      this.showToast(`Đồng bộ xong: ${updCount} thành công, ${errCount} lỗi.`, updCount > 0 ? 'success' : 'info', 5000);
+    } catch (err) {
+      if (statusBox) {
+        statusBox.innerHTML = `
+          <div style="padding: 14px 16px; background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); border-radius: var(--radius-md); color: #f87171;">
+            <i class="fa-solid fa-triangle-exclamation"></i> Lỗi kết nối máy chủ: ${err.message}
+          </div>`;
+      }
+      this.showToast('Lỗi: ' + err.message, 'error');
+    } finally {
+      if (btnStart) {
+        btnStart.disabled = false;
+        btnStart.innerHTML = '<i class="fa-solid fa-arrows-rotate"></i> 1. Quét & Tra Cứu Tự Động từ RSSP';
+      }
+    }
+  }
+
+  async handlePushToGoogleSheet() {
+    const webhookUrl = (document.getElementById('gsync-webhook-url')?.value || '').trim();
+    if (!webhookUrl) {
+      this.showToast('Vui lòng nhập Webhook URL trước!', 'error');
+      return;
+    }
+    if (!this._gSyncLastResult?.rows?.length) {
+      this.showToast('Chưa có dữ liệu để đẩy. Hãy chạy Quét & Tra Cứu trước.', 'warning');
+      return;
+    }
+
+    const btnPush = document.getElementById('gsync-btn-push');
+    if (btnPush) { btnPush.disabled = true; btnPush.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang đẩy lên Sheet...'; }
+
+    try {
+      const resp = await fetch('/api/admin/googlesheet/push', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          webhookUrl,
+          gid: this._gSyncLastResult.gid || '0',
+          updates: this._gSyncLastResult.rows
+            .filter(r => r.isSuccess)
+            .map(r => ({
+              row: r.rowIndex,
+              date: r.newDate || '',             // Cột B – Ngày bắt đầu sử dụng
+              name: r.newName || r.oldName,      // Cột C – HKD
+              taxId: r.newTaxId || r.oldTaxId,  // Cột D – MST
+              address: r.newAddress || r.oldAddress, // Cột E – Địa chỉ
+              uuid: r.agreementUUID,
+              passcode: r.passcode
+            }))
+        })
+      });
+      const data = await resp.json();
+      if (data.success) {
+        this.showToast('✓ ' + (data.message || 'Đã đẩy dữ liệu lên Google Sheet thành công!'), 'success', 6000);
+      } else {
+        this.showToast('✗ ' + (data.message || 'Webhook phản hồi lỗi.'), 'error', 6000);
+      }
+    } catch (err) {
+      this.showToast('Lỗi đẩy webhook: ' + err.message, 'error');
+    } finally {
+      if (btnPush) { btnPush.disabled = false; btnPush.innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> 2. Đẩy Dữ Liệu Lên Google Sheet (Webhook)'; }
+    }
+  }
+
+  async handleDownloadUpdatedCsv() {
+    const btnDownload = document.getElementById('gsync-btn-download');
+    if (btnDownload) { btnDownload.disabled = true; btnDownload.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang tải...'; }
+
+    try {
+      const resp = await fetch('/api/admin/googlesheet/export-csv', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rows: this._gSyncLastResult?.rows || [] })
+      });
+
+      if (!resp.ok) throw new Error('Server phản hồi lỗi: ' + resp.status);
+
+      const blob = await resp.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `google-sheet-updated-${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      this.showToast('Đã tải file CSV thành công!', 'success');
+    } catch (err) {
+      this.showToast('Lỗi tải CSV: ' + err.message, 'error');
+    } finally {
+      if (btnDownload) { btnDownload.disabled = false; btnDownload.innerHTML = '<i class="fa-solid fa-file-csv"></i> 3. Tải File CSV Đã Điền Đầy Đủ'; }
+    }
+  }
+
+  toggleAppsScriptGuide() {
+    const guideBox = document.getElementById('gsync-guide-box');
+    if (!guideBox) return;
+    const isHidden = guideBox.style.display === 'none';
+    guideBox.style.display = isHidden ? 'block' : 'none';
+    if (isHidden) {
+      const scriptArea = document.getElementById('gsync-script-code');
+      if (scriptArea && !scriptArea.value) {
+        scriptArea.value = `// Google Apps Script - Dán vào Extensions > Apps Script > Deploy as Web App
+function doPost(e) {
+  try {
+    var data = JSON.parse(e.postData.contents);
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = (data.gid
+      ? getSheetByGid_(ss, data.gid)
+      : ss.getSheetByName(data.sheetName || "Sheet1")) || ss.getActiveSheet();
+    if (data.action === "updateSheet" && data.updates) {
+      data.updates.forEach(function(upd) {
+        if (!upd.row) return;
+        // Cột B (2): Ngày bắt đầu sử dụng
+        if (upd.date)    sheet.getRange(upd.row, 2).setValue(upd.date);
+        // Cột C (3): HKD – Tên hộ kinh doanh
+        if (upd.name)    sheet.getRange(upd.row, 3).setValue(upd.name);
+        // Cột D (4): MST – Mã số thuế
+        if (upd.taxId)   sheet.getRange(upd.row, 4).setValue(upd.taxId);
+      });
+    }
+    return ContentService.createTextOutput(JSON.stringify({ok: true, updated: (data.updates||[]).length}))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch(err) {
+    return ContentService.createTextOutput(JSON.stringify({ok: false, error: err.toString()}))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+function getSheetByGid_(ss, gid) {
+  var sheets = ss.getSheets();
+  for (var i = 0; i < sheets.length; i++) {
+    if (String(sheets[i].getSheetId()) === String(gid)) return sheets[i];
+  }
+  return null;
+}`;
+      }
+    }
+  }
+
+  copyAppsScriptCode() {
+    const scriptArea = document.getElementById('gsync-script-code');
+    if (!scriptArea || !scriptArea.value) {
+      this.showToast('Hãy mở hướng dẫn trước để tải mã script!', 'warning');
+      return;
+    }
+    navigator.clipboard.writeText(scriptArea.value).then(() => {
+      this.showToast('Đã sao chép mã Apps Script vào clipboard!', 'success');
+    }).catch(() => {
+      scriptArea.select();
+      document.execCommand('copy');
+      this.showToast('Đã sao chép!', 'success');
+    });
   }
 
   // =================== HELPERS ===================

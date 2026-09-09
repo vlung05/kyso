@@ -407,6 +407,8 @@ namespace eSignCloudWeb.Models
         public string AgreementUUID { get; set; } = "";
         public string SignerName { get; set; } = "";
         public string Department { get; set; } = "";
+        public string TaxId { get; set; } = "";
+        public string Address { get; set; } = "";
         public string Email { get; set; } = "";
         public string Phone { get; set; } = "";
         public string DefaultPasscode { get; set; } = "";
