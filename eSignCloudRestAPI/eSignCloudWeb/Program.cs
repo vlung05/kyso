@@ -757,6 +757,79 @@ app.MapPost("/api/proxy/crm-company-info", async (HttpContext context, IHttpClie
     return Results.Content(resultString, "application/json");
 });
 
+app.MapPost("/api/proxy/crm-login", async (HttpContext context, IHttpClientFactory httpClientFactory) =>
+{
+    try
+    {
+        var client = httpClientFactory.CreateClient();
+        
+        // 1. GET request to Login.jsp
+        var getReq = new HttpRequestMessage(HttpMethod.Get, "https://crm.i-ca.vn/RAFrontEnd/Login.jsp");
+        var getRes = await client.SendAsync(getReq);
+        var html = await getRes.Content.ReadAsStringAsync();
+        
+        // Trích xuất CsrfToken
+        var match = System.Text.RegularExpressions.Regex.Match(html, @"id=""CsrfToken""\s+value=""([^""]+)""");
+        if (!match.Success) return Results.BadRequest(new { success = false, message = "Cannot find CsrfToken" });
+        var csrfToken = match.Groups[1].Value;
+
+        List<string> cookies = new List<string>();
+        if (getRes.Headers.TryGetValues("Set-Cookie", out var getCookies))
+        {
+            foreach (var c in getCookies)
+            {
+                var cookieVal = c.Split(';')[0];
+                cookies.Add(cookieVal);
+            }
+        }
+
+        // 2. POST request to LoginCommon
+        var postReq = new HttpRequestMessage(HttpMethod.Post, "https://crm.i-ca.vn/RAFrontEnd/LoginCommon");
+        if (cookies.Count > 0)
+        {
+            postReq.Headers.Add("Cookie", string.Join("; ", cookies));
+        }
+
+        var content = new FormUrlEncodedContent(new[]
+        {
+            new KeyValuePair<string, string>("idParam", "loginpage"),
+            new KeyValuePair<string, string>("sUserName", "bachkhoa"),
+            new KeyValuePair<string, string>("sPwd", "Toimanhnhat@10"),
+            new KeyValuePair<string, string>("sCaptcha", ""),
+            new KeyValuePair<string, string>("svn", "1"),
+            new KeyValuePair<string, string>("CsrfToken", csrfToken)
+        });
+        postReq.Content = content;
+
+        var postRes = await client.SendAsync(postReq);
+        var postHtml = await postRes.Content.ReadAsStringAsync();
+
+        // 3. Extract final Set-Cookie headers
+        if (postRes.Headers.TryGetValues("Set-Cookie", out var postCookies))
+        {
+            foreach (var c in postCookies)
+            {
+                var cookieVal = c.Split(';')[0];
+                var key = cookieVal.Split('=')[0];
+                cookies.RemoveAll(x => x.StartsWith(key + "="));
+                cookies.Add(cookieVal);
+            }
+        }
+
+        var finalCookie = string.Join("; ", cookies);
+        
+        if (postHtml.Contains("0#1#") || postHtml.Contains("0#2#") || postHtml.Contains("0#")) {
+             return Results.Ok(new { success = true, cookie = finalCookie });
+        } else {
+             return Results.Ok(new { success = false, message = "Login failed", raw = postHtml });
+        }
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(ex.Message);
+    }
+});
+
 Console.WriteLine("==================================================");
 Console.WriteLine("  eSignCloud Web Portal Server is running!       ");
 Console.WriteLine("==================================================");

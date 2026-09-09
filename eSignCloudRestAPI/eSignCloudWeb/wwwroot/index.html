@@ -360,7 +360,7 @@
          VIEW 3: SETTINGS PAGE (Cấu hình Program.cs & DemoFunction.cs)
          =================================================================== -->
     <section id="view-settings" class="view-section">
-      <div class="glass-card" style="max-width: 1200px; margin: 0 auto;">
+      <div class="glass-card" style="max-width: 1400px; margin: 0 auto;">
         <div class="box-header">
           <div class="box-title">
             <div class="box-title-icon"><i class="fa-solid fa-sliders"></i></div>
@@ -605,7 +605,8 @@
                 tin người ký nội bộ và kiểm tra trạng thái chứng thư RSSP.</p>
             </div>
             <div style="display: flex; gap: 8px;">
-              <button type="button" class="btn btn-outline btn-sm" onclick="app.bulkUpdateAddresses()" style="color: #38bdf8; border-color: rgba(56, 189, 248, 0.4);">
+              <button type="button" class="btn btn-outline btn-sm" onclick="app.bulkUpdateAddresses()"
+                style="color: #38bdf8; border-color: rgba(56, 189, 248, 0.4);">
                 <i class="fa-solid fa-cloud-arrow-down"></i> Lấy Địa Chỉ Hàng Loạt
               </button>
               <button type="button" class="btn btn-secondary btn-sm" onclick="app.openGoogleSheetSyncModal()"
@@ -615,6 +616,18 @@
               <button type="button" class="btn btn-primary btn-sm" onclick="app.openAddUidModal()">
                 <i class="fa-solid fa-plus"></i> Thêm UID Mới
               </button>
+            </div>
+          </div>
+
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; background: rgba(15,23,42,0.4); padding: 10px 16px; border-radius: 8px; border: 1px solid #334155;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <label style="font-size: 0.85rem; color: var(--text-muted);"><i class="fa-solid fa-filter"></i> Lọc tháng cấp chứng thư:</label>
+              <select id="uids-filter-month" class="form-input" style="width: 160px; padding: 4px 8px; font-size: 0.85rem;" onchange="app.renderUidsTable()">
+                <option value="all">Tất cả thời gian</option>
+              </select>
+            </div>
+            <div style="font-size: 0.85rem; font-weight: 500; color: #38bdf8;">
+              <i class="fa-solid fa-list-ol"></i> Tổng số lượng: <span id="uids-total-count" style="font-size: 1.1rem; color: #f8fafc; font-weight: 700; margin-left: 4px;">0</span> UID
             </div>
           </div>
 
@@ -890,7 +903,8 @@
               <li>Dán mã script bên dưới và bấm <b>Triển khai (Deploy)</b> -> <b>Tùy chọn triển khai mới (New
                   deployment)</b>.</li>
               <li>Chọn loại: <b>Ứng dụng web (Web app)</b>, mục Ai có quyền truy cập: <b>Bất kỳ ai (Anyone)</b> -> Bấm
-                <b>Triển khai</b> và dán link Webhook vào ô trên.</li>
+                <b>Triển khai</b> và dán link Webhook vào ô trên.
+              </li>
             </ol>
             <textarea id="gsync-script-code" readonly
               style="width: 100%; height: 95px; margin-top: 8px; font-family: monospace; font-size: 0.72rem; background: #0f172a; color: #a5f3fc; border: 1px solid #334155; border-radius: 4px; padding: 6px;"></textarea>

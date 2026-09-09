@@ -705,11 +705,59 @@ class AppController {
     if (!tbody) return;
     const accounts = this.config?.accounts || [];
 
-    if (accounts.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="10" style="text-align: center; color: var(--text-muted); padding: 24px;">Chưa có tài khoản UID nào. Hãy bấm "Thêm UID Mới".</td></tr>`;
+    // Lấy danh sách các tháng có trong dữ liệu (YYYY-MM)
+    const monthSet = new Set();
+    accounts.forEach(acc => {
+      if (acc.validFrom) {
+        const d = new Date(acc.validFrom);
+        const m = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        monthSet.add(m);
+      }
+    });
+    
+    // Cập nhật dropdown nếu chưa có
+    const filterSelect = document.getElementById('uids-filter-month');
+    if (filterSelect) {
+      const currentVal = filterSelect.value;
+      const sortedMonths = Array.from(monthSet).sort().reverse(); // Mới nhất lên đầu
+      
+      let optionsHtml = `<option value="all">Tất cả thời gian</option>`;
+      sortedMonths.forEach(m => {
+        const parts = m.split('-');
+        const label = `Tháng ${parts[1]}/${parts[0]}`;
+        optionsHtml += `<option value="${m}">${label}</option>`;
+      });
+      
+      if (filterSelect.getAttribute('data-loaded-months') !== sortedMonths.join(',')) {
+        filterSelect.innerHTML = optionsHtml;
+        filterSelect.value = currentVal && sortedMonths.includes(currentVal) ? currentVal : 'all';
+        filterSelect.setAttribute('data-loaded-months', sortedMonths.join(','));
+      }
+    }
+
+    // Lọc accounts theo dropdown
+    const selectedMonth = filterSelect ? filterSelect.value : 'all';
+    const filteredAccounts = selectedMonth === 'all' 
+      ? accounts 
+      : accounts.filter(acc => {
+          if (!acc.validFrom) return false;
+          const d = new Date(acc.validFrom);
+          const m = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+          return m === selectedMonth;
+        });
+
+    // Cập nhật tổng số lượng
+    const countEl = document.getElementById('uids-total-count');
+    if (countEl) {
+      countEl.textContent = filteredAccounts.length;
+    }
+
+    if (filteredAccounts.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="11" style="text-align: center; color: var(--text-muted); padding: 24px;">Chưa có tài khoản UID nào phù hợp với bộ lọc.</td></tr>`;
       return;
     }
-    const sortedAccounts = [...accounts].sort((a, b) => {
+
+    const sortedAccounts = [...filteredAccounts].sort((a, b) => {
       const aTime = a.validFrom ? new Date(a.validFrom).getTime() : 0;
       const bTime = b.validFrom ? new Date(b.validFrom).getTime() : 0;
       return bTime - aTime; 
@@ -750,7 +798,13 @@ class AppController {
           ${taxId ? `<span style="color: #f59e0b; font-size: 0.85rem; font-weight: 500;">${taxId}</span>` : '<span style="color: var(--text-muted); font-size: 0.8rem;">--</span>'}
         </td>
         <td>
-          ${address ? `<span style="color: #cbd5e1; font-size: 0.82rem; display: inline-flex; align-items: center; gap: 4px;" title="${address}"><i class="fa-solid fa-location-dot" style="font-size: 0.72rem; color: #f43f5e; opacity: 0.85;"></i>${address}</span>` : '<span style="color: var(--text-muted); font-size: 0.8rem;">--</span>'}
+          <div style="display: flex; align-items: center; gap: 4px;">
+            <i class="fa-solid fa-location-dot" 
+               style="font-size: 0.85rem; color: #f43f5e; cursor: pointer; opacity: 0.85;" 
+               title="Lấy địa chỉ theo MST" 
+               onclick="app.fetchSingleAddress('${acc.agreementUUID}')"></i>
+            ${address ? `<span style="color: #cbd5e1; font-size: 0.82rem;" title="${address}">${address}</span>` : '<span style="color: var(--text-muted); font-size: 0.8rem;">--</span>'}
+          </div>
         </td>
         <td>
           ${acc.phone ? `<span style="color: #38bdf8; font-family: monospace; font-size: 0.82rem; display: inline-flex; align-items: center; gap: 4px;"><i class="fa-solid fa-phone" style="font-size: 0.72rem; opacity: 0.75;"></i>${acc.phone}</span>` : '<span style="color: var(--text-muted); font-size: 0.8rem;">--</span>'}
@@ -822,8 +876,16 @@ class AppController {
           if (data && data.length > 0) {
             const info = data[0];
             if (info.Code === "LOGIN") {
-              this.showToast('Phiên đăng nhập CRM đã hết hạn. Đang dừng tiến trình.', 'error');
-              break;
+              const newCookie = await this.autoRefreshCrmCookie();
+              if (newCookie) {
+                crmCookie = newCookie;
+                if (crmCookieInput) crmCookieInput.value = '';
+                i--; // Lùi lại 1 bước để thử lại taxId này
+                continue;
+              } else {
+                this.showToast('Phiên đăng nhập CRM đã hết hạn. Đang dừng tiến trình.', 'error');
+                break;
+              }
             }
             const name = info.TEN_GOI || info.COMPANY_NAME || info.NAME || '';
             const address = info.DIA_CHI || info.ADDRESS || info.COMPANY_ADDRESS || '';
@@ -865,6 +927,107 @@ class AppController {
     }
   }
 
+  async fetchSingleAddress(uuid) {
+    const acc = (this.config?.accounts || []).find(a => a.agreementUUID === uuid);
+    if (!acc) return;
+    const taxId = this.extractTaxId(acc);
+    if (!taxId) {
+      this.showToast('Tài khoản này không có Mã số thuế (MST)!', 'warning');
+      return;
+    }
+
+    const crmCookieInput = document.getElementById('crm-cookie-input');
+    let crmCookie = crmCookieInput ? crmCookieInput.value.trim() : '';
+    if (!crmCookie) {
+      crmCookie = localStorage.getItem('eSign_crm_cookie') || '';
+    }
+
+    this.showToast(`Đang lấy thông tin cho MST ${taxId}...`, 'info');
+    
+    const doFetch = async (cookieStr) => {
+      const formData = new FormData();
+      formData.append('vMST', taxId);
+      formData.append('crmCookie', cookieStr);
+      const resp = await fetch('/api/proxy/crm-company-info', { method: 'POST', body: formData });
+      if (!resp.ok) throw new Error(`HTTP error! status: ${resp.status}`);
+      return await resp.json();
+    };
+
+    try {
+      let data = await doFetch(crmCookie);
+      if (data && data.length > 0) {
+        let info = data[0];
+        if (info.Code === "LOGIN") {
+          const newCookie = await this.autoRefreshCrmCookie();
+          if (newCookie) {
+            crmCookie = newCookie;
+            if (crmCookieInput) crmCookieInput.value = '';
+            data = await doFetch(crmCookie);
+            info = data && data.length > 0 ? data[0] : null;
+          } else {
+            this.showToast('Phiên đăng nhập CRM đã hết hạn. Vui lòng cập nhật lại chuỗi Cookie!', 'error');
+            return;
+          }
+        }
+        
+        if (info && info.Code !== "LOGIN") {
+          const name = info.TEN_GOI || info.COMPANY_NAME || info.NAME || '';
+          const address = info.DIA_CHI || info.ADDRESS || info.COMPANY_ADDRESS || '';
+          const email = info.EMAIL || '';
+          const phone = info.DIEN_THOAI || info.PHONE || info.MOBILE || '';
+
+          let changed = false;
+          if (name && acc.signerName !== name) { acc.signerName = name; changed = true; }
+          if (address && acc.address !== address) { acc.address = address; changed = true; }
+          if (email && acc.email !== email) { acc.email = email; changed = true; }
+          if (phone && acc.phone !== phone) { acc.phone = phone; changed = true; }
+
+          if (changed) {
+            const resp = await fetch('/api/config', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(this.config)
+            });
+            if (resp.ok) {
+              this.renderUidsTable();
+              this.showToast('Đã cập nhật thông tin địa chỉ thành công!', 'success');
+            }
+          } else {
+            this.showToast('Thông tin không có sự thay đổi.', 'info');
+          }
+        } else {
+          this.showToast('Không tìm thấy thông tin cho MST này!', 'warning');
+        }
+      } else {
+        this.showToast('Không tìm thấy thông tin cho MST này!', 'warning');
+      }
+    } catch (err) {
+      this.showToast('Lỗi lấy thông tin: ' + err.message, 'error');
+    }
+  }
+
+  async autoRefreshCrmCookie() {
+    this.showToast('Đang tự động đăng nhập CRM để làm mới phiên...', 'info');
+    try {
+      const resp = await fetch('/api/proxy/crm-login', { method: 'POST' });
+      if (resp.ok) {
+        const data = await resp.json();
+        if (data.success && data.cookie) {
+          localStorage.setItem('eSign_crm_cookie', data.cookie);
+          const crmCookieInput = document.getElementById('crm-cookie-input');
+          if (crmCookieInput) crmCookieInput.value = data.cookie;
+          this.showToast('Tự động đăng nhập & cập nhật Cookie CRM thành công!', 'success');
+          return data.cookie;
+        }
+      }
+      this.showToast('Tự động cập nhật Cookie thất bại. Vui lòng kiểm tra lại.', 'error');
+      return null;
+    } catch (e) {
+      this.showToast('Lỗi khi cập nhật Cookie: ' + e.message, 'error');
+      return null;
+    }
+  }
+
   async fetchCompanyInfo() {
     const taxIdInput = document.getElementById('uid-input-taxid');
     const taxId = taxIdInput.value.trim();
@@ -897,6 +1060,12 @@ class AppController {
       if (data && data.length > 0) {
         const info = data[0];
         if (info.Code === "LOGIN") {
+          const newCookie = await this.autoRefreshCrmCookie();
+          if (newCookie) {
+            // Xóa input để vòng lặp/fetch dùng cookie trong localStorage
+            if (crmCookieInput) crmCookieInput.value = ''; 
+            return await this.fetchCompanyInfo();
+          }
           this.showToast('Phiên đăng nhập CRM đã hết hạn. Vui lòng cập nhật lại chuỗi Cookie!', 'error');
           return;
         }
